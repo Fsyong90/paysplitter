@@ -820,25 +820,61 @@
             display: block;
         }
 
-        /* OCR Section */
+        /* Receipt Scan Section - Modern Design */
         .ocr-section {
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
 
         .ocr-upload {
             width: 100%;
-            padding: 20px;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
+            padding: 24px 20px;
+            border: none;
+            border-radius: 16px;
             text-align: center;
             cursor: pointer;
-            background: #fafafa;
-            transition: all 0.2s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
         .ocr-upload:hover {
-            border-color: #7B2D8E;
-            background: #f5f0f7;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .ocr-upload:active {
+            transform: translateY(0);
+        }
+
+        .ocr-upload .upload-icon {
+            font-size: 32px;
+            margin-bottom: 4px;
+        }
+
+        .ocr-upload .upload-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .ocr-upload .upload-subtitle {
+            font-size: 12px;
+            opacity: 0.85;
+        }
+
+        .ocr-upload .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            margin-top: 4px;
         }
 
         .ocr-upload input {
@@ -1063,11 +1099,14 @@
         <div class="card">
             <div class="card-title"><span class="icon">🍽️</span> What's Ordered?</div>
 
-            <!-- OCR Upload -->
+            <!-- AI Receipt Scanner -->
             <div class="ocr-section">
                 <label class="ocr-upload" id="ocrUpload">
                     <input type="file" accept="image/*" onchange="handleReceiptUpload(event)">
-                    📷 Scan Receipt (tap to upload photo)
+                    <span class="upload-icon">📸</span>
+                    <span class="upload-title">Scan Receipt with AI</span>
+                    <span class="upload-subtitle">Take a photo or upload an image</span>
+                    <span class="ai-badge">✨ Powered by AI</span>
                 </label>
                 <div class="ocr-status" id="ocrStatus"></div>
             </div>
