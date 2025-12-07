@@ -864,6 +864,80 @@
             color: #c62828;
         }
 
+        /* API Key Settings */
+        .ocr-settings {
+            margin-top: 10px;
+        }
+
+        .ocr-settings-toggle {
+            background: none;
+            border: none;
+            color: #7B2D8E;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .ocr-settings-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .ocr-settings-panel {
+            display: none;
+            margin-top: 8px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .ocr-settings-panel.show {
+            display: block;
+        }
+
+        .ocr-settings-panel label {
+            display: block;
+            margin-bottom: 6px;
+            color: #666;
+        }
+
+        .ocr-settings-panel input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .ocr-settings-panel .api-hint {
+            margin-top: 6px;
+            color: #888;
+            font-size: 11px;
+        }
+
+        .ocr-settings-panel .api-hint a {
+            color: #7B2D8E;
+        }
+
+        .ocr-engine-badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .ocr-engine-badge.tesseract {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
         /* Payment tracking */
         .person-header {
             display: flex;
@@ -1067,9 +1141,21 @@
             <div class="ocr-section">
                 <label class="ocr-upload" id="ocrUpload">
                     <input type="file" accept="image/*" onchange="handleReceiptUpload(event)">
-                    📷 Scan Receipt (tap to upload photo)
+                    📷 Scan Receipt <span id="ocrEngineBadge" class="ocr-engine-badge tesseract">Tesseract</span>
                 </label>
                 <div class="ocr-status" id="ocrStatus"></div>
+                <div class="ocr-settings">
+                    <button class="ocr-settings-toggle" onclick="toggleOcrSettings()">
+                        ⚙️ <span id="ocrSettingsLabel">Use Google Vision (better accuracy)</span>
+                    </button>
+                    <div class="ocr-settings-panel" id="ocrSettingsPanel">
+                        <label>Google Cloud Vision API Key:</label>
+                        <input type="password" id="googleApiKey" placeholder="Enter your API key" onchange="saveApiKey()">
+                        <div class="api-hint">
+                            Free: 1,000 scans/month. <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Get API key</a>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="itemsList"></div>
@@ -1244,9 +1330,11 @@
         // LocalStorage keys
         const TEAM_KEY = 'paynow_team';
         const HISTORY_KEY = 'paynow_history';
+        const API_KEY_KEY = 'paynow_google_api_key';
 
         // Initialize
         function init() {
+            loadApiKey();
             loadSavedTeam();
             loadHistory();
             checkUrlParams();
@@ -1945,6 +2033,50 @@
 
         // ==================== OCR (Receipt Scanning) ====================
 
+        // API Key Management
+        function loadApiKey() {
+            const savedKey = localStorage.getItem(API_KEY_KEY);
+            if (savedKey) {
+                document.getElementById('googleApiKey').value = savedKey;
+                updateOcrBadge(true);
+            }
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('googleApiKey').value.trim();
+            if (key) {
+                localStorage.setItem(API_KEY_KEY, key);
+                updateOcrBadge(true);
+                showToast('API key saved');
+            } else {
+                localStorage.removeItem(API_KEY_KEY);
+                updateOcrBadge(false);
+            }
+        }
+
+        function updateOcrBadge(hasGoogleKey) {
+            const badge = document.getElementById('ocrEngineBadge');
+            const label = document.getElementById('ocrSettingsLabel');
+            if (hasGoogleKey) {
+                badge.textContent = 'Google Vision';
+                badge.className = 'ocr-engine-badge';
+                label.textContent = 'Google Vision API configured ✓';
+            } else {
+                badge.textContent = 'Tesseract';
+                badge.className = 'ocr-engine-badge tesseract';
+                label.textContent = 'Use Google Vision (better accuracy)';
+            }
+        }
+
+        function toggleOcrSettings() {
+            const panel = document.getElementById('ocrSettingsPanel');
+            panel.classList.toggle('show');
+        }
+
+        function getGoogleApiKey() {
+            return localStorage.getItem(API_KEY_KEY);
+        }
+
         // Handle receipt upload
         async function handleReceiptUpload(event) {
             const file = event.target.files[0];
@@ -1952,44 +2084,112 @@
 
             const status = document.getElementById('ocrStatus');
             status.className = 'ocr-status show';
-            status.textContent = 'Loading OCR engine...';
+
+            const apiKey = getGoogleApiKey();
 
             try {
-                // Load Tesseract.js on demand
-                if (!tesseractLoaded) {
-                    await loadTesseract();
-                    tesseractLoaded = true;
+                let text = '';
+
+                if (apiKey) {
+                    // Use Google Vision API
+                    status.textContent = 'Scanning with Google Vision...';
+                    text = await scanWithGoogleVision(file, apiKey);
+                } else {
+                    // Fallback to Tesseract
+                    status.textContent = 'Loading OCR engine...';
+                    if (!tesseractLoaded) {
+                        await loadTesseract();
+                        tesseractLoaded = true;
+                    }
+                    status.textContent = 'Scanning receipt...';
+                    const result = await Tesseract.recognize(file, 'eng', {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                status.textContent = `Scanning... ${Math.round(m.progress * 100)}%`;
+                            }
+                        }
+                    });
+                    text = result.data.text;
                 }
 
-                status.textContent = 'Scanning receipt...';
-
-                const result = await Tesseract.recognize(file, 'eng', {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            status.textContent = `Scanning... ${Math.round(m.progress * 100)}%`;
-                        }
-                    }
-                });
-
-                const text = result.data.text;
+                console.log('OCR Raw Text:', text);
                 const extracted = extractItemsFromText(text);
 
                 if (extracted.length > 0) {
-                    // Show preview instead of adding directly
                     showOcrPreview(extracted);
                     status.textContent = `Found ${extracted.length} items - review below`;
                     setTimeout(() => { status.className = 'ocr-status'; }, 3000);
                 } else {
                     status.className = 'ocr-status show error';
-                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${text.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
+                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${text.replace(/`/g, "'").replace(/\\/g, "\\\\").replace(/\n/g, "\\n")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
                 }
             } catch (e) {
                 console.error('OCR error:', e);
                 status.className = 'ocr-status show error';
-                status.textContent = 'Error scanning receipt. Please try again.';
+                if (e.message && e.message.includes('API')) {
+                    status.textContent = 'API Error: ' + e.message;
+                } else {
+                    status.textContent = 'Error scanning receipt. Please try again.';
+                }
             }
 
             event.target.value = '';
+        }
+
+        // Google Vision API OCR
+        async function scanWithGoogleVision(file, apiKey) {
+            // Convert file to base64
+            const base64 = await fileToBase64(file);
+
+            const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    requests: [{
+                        image: { content: base64 },
+                        features: [{ type: 'TEXT_DETECTION' }]
+                    }]
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error.message || 'API request failed');
+            }
+
+            if (!data.responses || !data.responses[0]) {
+                throw new Error('No response from API');
+            }
+
+            const result = data.responses[0];
+
+            if (result.error) {
+                throw new Error(result.error.message || 'API error');
+            }
+
+            if (!result.textAnnotations || result.textAnnotations.length === 0) {
+                return ''; // No text found
+            }
+
+            // First annotation contains the full text
+            return result.textAnnotations[0].description || '';
+        }
+
+        // Convert file to base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
         }
 
         // Show OCR preview modal
@@ -2053,7 +2253,7 @@
             showToast(`Added ${selected.length} items`);
         }
 
-        // Load Tesseract.js dynamically
+        // Load Tesseract.js dynamically (fallback)
         function loadTesseract() {
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
@@ -2064,64 +2264,109 @@
             });
         }
 
-        // Extract items and prices from OCR text
+        // Extract items and prices from OCR text (improved for Google Vision)
         function extractItemsFromText(text) {
-            console.log('OCR Raw Text:', text); // Debug output
             const lines = text.split('\n').filter(l => l.trim());
-            const items = [];
+            const extractedItems = [];
 
-            // Multiple price patterns to catch different formats
-            const pricePatterns = [
-                /(\d+[.,]\d{2})\s*$/,           // Price at end: "Chicken Rice 5.50"
-                /^\s*(\d+[.,]\d{2})/,           // Price at start: "5.50 Chicken Rice"
-                /\$\s*(\d+[.,]\d{2})/,          // With dollar sign: "$5.50"
-                /S\$\s*(\d+[.,]\d{2})/i,        // Singapore dollar: "S$5.50"
-                /(\d+[.,]\d{2})/,               // Any decimal number
-                /(\d+[.,]\d{1})\s*$/,           // Single decimal: "5.5"
-                /(\d+)\s*$/                      // Whole number at end: "5"
+            // Skip words - expanded list
+            const skipWords = [
+                'total', 'subtotal', 'sub-total', 'sub total',
+                'gst', 'tax', 'vat', 'service charge', 'svc',
+                'change', 'cash', 'card', 'visa', 'master', 'amex', 'nets', 'paynow', 'paylah',
+                'thank', 'welcome', 'receipt', 'invoice', 'bill',
+                'date', 'time', 'tel', 'phone', 'address', 'table',
+                'payment', 'amount due', 'balance', 'tendered', 'rounding',
+                'qty', 'quantity', 'no.', 'item#'
             ];
 
+            // Price patterns - more comprehensive
+            const pricePatterns = [
+                /(\d{1,3}[.,]\d{2})\s*$/,           // Price at end: "Chicken Rice 5.50"
+                /\$\s*(\d{1,3}[.,]\d{2})/,          // With dollar sign: "$5.50"
+                /S\$\s*(\d{1,3}[.,]\d{2})/i,        // Singapore dollar: "S$5.50"
+                /SGD\s*(\d{1,3}[.,]\d{2})/i,        // SGD format
+                /(\d{1,3}[.,]\d{2})\s*(?:SGD|S\$|\$)?/i,  // Price with optional currency after
+            ];
+
+            // Quantity pattern: "2 x Item" or "2x Item" or "Item x2"
+            const qtyPattern = /^(\d+)\s*[xX]\s+(.+)|(.+)\s+[xX]\s*(\d+)$/;
+
             lines.forEach(line => {
-                // Skip common non-item lines
-                const skipWords = ['total', 'subtotal', 'gst', 'tax', 'change', 'cash', 'card', 'visa', 'master', 'nets', 'thank', 'welcome', 'receipt', 'invoice', 'date', 'time', 'tel', 'address'];
-                const lowerLine = line.toLowerCase();
+                const trimmedLine = line.trim();
+                if (!trimmedLine) return;
+
+                // Skip if matches skip words
+                const lowerLine = trimmedLine.toLowerCase();
                 if (skipWords.some(word => lowerLine.includes(word))) return;
 
-                let match = null;
-                let price = 0;
+                // Skip lines that are just numbers/dates
+                if (/^\d+[\/\-\.]\d+[\/\-\.]\d+/.test(trimmedLine)) return;
+                if (/^\d{1,2}:\d{2}/.test(trimmedLine)) return;
+                if (/^[\d\s\.\-\+\$]+$/.test(trimmedLine)) return;
 
-                // Try each pattern
+                let price = 0;
+                let name = '';
+                let quantity = 1;
+
+                // Try to find price
                 for (const pattern of pricePatterns) {
-                    match = line.match(pattern);
+                    const match = trimmedLine.match(pattern);
                     if (match) {
-                        price = parseFloat(match[1].replace(',', '.'));
-                        if (price > 0 && price < 200) break; // Valid price found
-                        match = null;
+                        const potentialPrice = parseFloat(match[1].replace(',', '.'));
+                        if (potentialPrice > 0 && potentialPrice < 500) {
+                            price = potentialPrice;
+                            name = trimmedLine.replace(match[0], '').trim();
+                            break;
+                        }
                     }
                 }
 
-                if (match && price > 0 && price < 200) {
-                    let name = line.replace(match[0], '').trim();
-                    // Clean up the name
-                    name = name.replace(/^[\s\-\*\.x\d\$S]+/i, '').replace(/[\s\-\*\.\$]+$/, '').trim();
-                    name = name.replace(/\s+/g, ' '); // Normalize spaces
+                if (price === 0) return;
 
-                    if (name.length >= 1 && name.length < 60) {
-                        items.push({ name: name || `Item $${price.toFixed(2)}`, price });
-                    } else if (price >= 1) {
-                        // If no name but valid price, still add it
-                        items.push({ name: `Item $${price.toFixed(2)}`, price });
+                // Check for quantity pattern in name
+                const qtyMatch = name.match(qtyPattern);
+                if (qtyMatch) {
+                    if (qtyMatch[1] && qtyMatch[2]) {
+                        quantity = parseInt(qtyMatch[1]);
+                        name = qtyMatch[2];
+                    } else if (qtyMatch[3] && qtyMatch[4]) {
+                        quantity = parseInt(qtyMatch[4]);
+                        name = qtyMatch[3];
                     }
+                }
+
+                // Clean up name
+                name = name
+                    .replace(/^[\s\-\*\.x\d\$S@#]+/i, '')  // Remove leading junk
+                    .replace(/[\s\-\*\.\$@#]+$/, '')        // Remove trailing junk
+                    .replace(/\s+/g, ' ')                   // Normalize spaces
+                    .trim();
+
+                // Validate
+                if (name.length < 1 || name.length > 80) {
+                    name = `Item $${price.toFixed(2)}`;
+                }
+
+                // Handle quantity - either add multiple items or multiply price
+                if (quantity > 1 && quantity <= 10) {
+                    // Add as single item with multiplied indication
+                    extractedItems.push({
+                        name: `${name} (x${quantity})`,
+                        price: price * quantity
+                    });
+                } else {
+                    extractedItems.push({ name, price });
                 }
             });
 
-            console.log('Extracted items:', items); // Debug output
-            return items;
+            console.log('Extracted items:', extractedItems);
+            return extractedItems;
         }
 
         // Manual entry fallback - show raw OCR text for user to copy
         function showRawOcrText(text) {
-            const cleanText = text.replace(/\n+/g, '\n').trim();
+            const cleanText = text.replace(/\\n/g, '\n').replace(/\n+/g, '\n').trim();
             alert('OCR Result (copy items manually):\n\n' + cleanText);
         }
 
