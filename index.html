@@ -426,11 +426,11 @@
 
         .total-match {
             text-align: center;
-            padding: 8px;
+            padding: 12px;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
-            margin-top: 8px;
+            margin-top: 12px;
             display: none;
         }
 
@@ -438,12 +438,27 @@
             display: block;
             background: #d4edda;
             color: #155724;
+            border: 2px solid #28a745;
         }
 
         .total-match.mismatch {
             display: block;
             background: #f8d7da;
             color: #721c24;
+            border: 2px solid #dc3545;
+        }
+
+        .total-match .match-icon {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .total-match .match-hint {
+            font-size: 11px;
+            font-weight: 400;
+            opacity: 0.8;
+            margin-top: 4px;
         }
 
         .negative {
@@ -1655,8 +1670,8 @@
 
             if (expected <= 0) {
                 matchDiv.className = 'total-match';
-                matchDiv.textContent = '';
-                return;
+                matchDiv.innerHTML = '';
+                return false;
             }
 
             if (calculatedTotal === undefined) {
@@ -1669,12 +1684,32 @@
 
             if (diff < 0.05) {
                 matchDiv.className = 'total-match match';
-                matchDiv.textContent = '✓ Total matches expected amount!';
+                matchDiv.innerHTML = `
+                    <span class="match-icon">✅</span>
+                    Total matches receipt!
+                    <div class="match-hint">Safe to share with your team</div>
+                `;
+                return true;
             } else {
                 matchDiv.className = 'total-match mismatch';
                 const diffSign = calculatedTotal > expected ? '+' : '-';
-                matchDiv.textContent = `⚠ Difference: ${diffSign}S$${diff.toFixed(2)} (Expected: S$${expected.toFixed(2)})`;
+                matchDiv.innerHTML = `
+                    <span class="match-icon">⚠️</span>
+                    Difference: ${diffSign}S$${diff.toFixed(2)}
+                    <div class="match-hint">Expected S$${expected.toFixed(2)} • Check items or bill options</div>
+                `;
+                return false;
             }
+        }
+
+        // Check if totals match before critical actions
+        function isTotalMatched() {
+            const expected = parseFloat(document.getElementById('expectedTotal').value) || 0;
+            if (expected <= 0) return true; // No expected total set, allow action
+
+            const totalText = document.getElementById('totalDisplay').textContent;
+            const calculated = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+            return Math.abs(calculated - expected) < 0.05;
         }
 
         // Rounding helper
@@ -1926,12 +1961,22 @@
 
         // Share via WhatsApp
         function shareWhatsApp() {
+            if (!isTotalMatched()) {
+                if (!confirm('⚠️ Total doesn\'t match receipt!\n\nAre you sure you want to share anyway?')) {
+                    return;
+                }
+            }
             const text = encodeURIComponent(generateShareText());
             window.open(`https://wa.me/?text=${text}`, '_blank');
         }
 
         // Copy share link
         function copyShareLink() {
+            if (!isTotalMatched()) {
+                if (!confirm('⚠️ Total doesn\'t match receipt!\n\nAre you sure you want to copy the link anyway?')) {
+                    return;
+                }
+            }
             const data = {
                 p: people,
                 i: items.map(it => ({ n: it.name, pr: it.price, ppl: it.people })),
