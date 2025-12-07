@@ -8,6 +8,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -1260,6 +1261,124 @@
             color: #888;
             font-weight: 400;
         }
+
+        /* Receipt Preview Section */
+        .receipt-preview-section {
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .receipt-preview-section.show {
+            display: block;
+        }
+
+        .receipt-preview-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .receipt-thumbnail {
+            width: 60px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid #e9ecef;
+        }
+
+        .receipt-thumbnail:hover {
+            border-color: #7B2D8E;
+        }
+
+        .receipt-info {
+            flex: 1;
+        }
+
+        .receipt-info .label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .receipt-info .meta {
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .receipt-info .date-badge {
+            display: inline-block;
+            background: #7B2D8E;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+
+        /* Full Receipt Modal */
+        .receipt-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .receipt-modal.show {
+            display: flex;
+        }
+
+        .receipt-modal img {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+
+        .receipt-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .receipt-uploading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e9ecef;
+            border-top-color: #7B2D8E;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1319,6 +1438,18 @@
         <!-- Items -->
         <div class="card">
             <div class="card-title"><span class="icon">🍽️</span> What's Ordered?</div>
+
+            <!-- Receipt Preview (shared with team) -->
+            <div class="receipt-preview-section" id="receiptPreviewSection">
+                <div class="receipt-preview-card">
+                    <img class="receipt-thumbnail" id="receiptThumbnail" src="" alt="Receipt" onclick="showReceiptModal()">
+                    <div class="receipt-info">
+                        <div class="label">📷 Today's Receipt</div>
+                        <div class="meta" id="receiptMeta">Uploaded just now</div>
+                        <div class="date-badge" id="receiptDate"></div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Quick Split Buttons -->
             <div class="quick-split-section" id="quickSplitSection">
@@ -1506,6 +1637,12 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <!-- Receipt Full View Modal -->
+    <div class="receipt-modal" id="receiptModal" onclick="closeReceiptModal()">
+        <button class="receipt-modal-close" onclick="closeReceiptModal()">×</button>
+        <img id="receiptFullImage" src="" alt="Receipt">
+    </div>
+
     <!-- Receipt Preview Modal -->
     <div class="preview-modal" id="previewModal">
         <div class="preview-content">
@@ -1549,6 +1686,10 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // Current receipt image URL (shared with team)
+        let currentReceiptUrl = null;
 
         // Team code for syncing
         let currentTeamCode = null;
@@ -1652,6 +1793,13 @@
                         splitHistory = data.history;
                         localStorage.setItem(HISTORY_KEY, JSON.stringify(splitHistory));
                         renderHistory();
+                    }
+                    // Check for shared receipt
+                    if (data.receiptUrl) {
+                        currentReceiptUrl = data.receiptUrl;
+                        showReceiptPreview(data.receiptUrl, data.receiptDate, data.receiptUploader);
+                    } else {
+                        hideReceiptPreview();
                     }
                     updateSyncStatus('synced');
                 }
@@ -2525,6 +2673,93 @@
             }
         }
 
+        // ==================== RECEIPT IMAGE SHARING (Firebase Storage) ====================
+
+        // Upload receipt image to Firebase Storage
+        async function uploadReceiptToFirebase(file) {
+            if (!currentTeamCode) return;
+
+            try {
+                const today = new Date();
+                const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+                const fileName = `receipts/${currentTeamCode}/${dateStr}_${Date.now()}.jpg`;
+
+                const storageRef = storage.ref(fileName);
+                const snapshot = await storageRef.put(file);
+                const downloadUrl = await snapshot.ref.getDownloadURL();
+
+                // Save URL to Firestore for team to see
+                await db.collection('teams').doc(currentTeamCode).update({
+                    receiptUrl: downloadUrl,
+                    receiptDate: today.toISOString(),
+                    receiptUploader: 'Team member' // Could add user name later
+                });
+
+                console.log('Receipt uploaded:', downloadUrl);
+                return downloadUrl;
+
+            } catch (e) {
+                console.error('Error uploading receipt:', e);
+            }
+        }
+
+        // Show receipt preview
+        function showReceiptPreview(url, dateStr, uploader) {
+            const section = document.getElementById('receiptPreviewSection');
+            const thumbnail = document.getElementById('receiptThumbnail');
+            const meta = document.getElementById('receiptMeta');
+            const dateBadge = document.getElementById('receiptDate');
+
+            thumbnail.src = url;
+            currentReceiptUrl = url;
+
+            // Format date
+            const date = new Date(dateStr);
+            const today = new Date();
+            const isToday = date.toDateString() === today.toDateString();
+
+            if (isToday) {
+                const timeAgo = getTimeAgo(date);
+                meta.textContent = `Uploaded ${timeAgo}`;
+            } else {
+                meta.textContent = `Uploaded on ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+            }
+
+            dateBadge.textContent = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+            section.classList.add('show');
+        }
+
+        // Hide receipt preview
+        function hideReceiptPreview() {
+            document.getElementById('receiptPreviewSection').classList.remove('show');
+            currentReceiptUrl = null;
+        }
+
+        // Get time ago string
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            if (seconds < 60) return 'just now';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        // Show full receipt modal
+        function showReceiptModal() {
+            if (!currentReceiptUrl) return;
+            document.getElementById('receiptFullImage').src = currentReceiptUrl;
+            document.getElementById('receiptModal').classList.add('show');
+        }
+
+        // Close receipt modal
+        function closeReceiptModal() {
+            document.getElementById('receiptModal').classList.remove('show');
+        }
+
         // ==================== Receipt Scanning (ai.insea.io API) ====================
 
         const INSEA_API_KEY = 'yz1PZMqqNAQRVXeOmie0gkaDft9I2l0R';
@@ -2535,11 +2770,22 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            // Check file size (max 2MB for protection)
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('Image too large! Max 2MB');
+                return;
+            }
+
             const status = document.getElementById('ocrStatus');
             status.className = 'ocr-status show';
             status.textContent = 'Uploading receipt...';
 
             try {
+                // Upload image to Firebase Storage if connected to team
+                if (currentTeamCode) {
+                    await uploadReceiptToFirebase(file);
+                }
+
                 // Create FormData and send to ai.insea.io
                 const formData = new FormData();
                 formData.append('receipt_image', file);
