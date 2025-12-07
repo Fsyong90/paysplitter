@@ -1981,7 +1981,7 @@
                     setTimeout(() => { status.className = 'ocr-status'; }, 3000);
                 } else {
                     status.className = 'ocr-status show error';
-                    status.textContent = 'No items found. Try a clearer photo.';
+                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${text.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
                 }
             } catch (e) {
                 console.error('OCR error:', e);
@@ -2066,27 +2066,63 @@
 
         // Extract items and prices from OCR text
         function extractItemsFromText(text) {
+            console.log('OCR Raw Text:', text); // Debug output
             const lines = text.split('\n').filter(l => l.trim());
             const items = [];
 
-            // Pattern: item name followed by price (e.g., "Chicken Rice 5.50" or "5.50 Chicken Rice")
-            const pricePattern = /(\d+[.,]\d{2})/;
+            // Multiple price patterns to catch different formats
+            const pricePatterns = [
+                /(\d+[.,]\d{2})\s*$/,           // Price at end: "Chicken Rice 5.50"
+                /^\s*(\d+[.,]\d{2})/,           // Price at start: "5.50 Chicken Rice"
+                /\$\s*(\d+[.,]\d{2})/,          // With dollar sign: "$5.50"
+                /S\$\s*(\d+[.,]\d{2})/i,        // Singapore dollar: "S$5.50"
+                /(\d+[.,]\d{2})/,               // Any decimal number
+                /(\d+[.,]\d{1})\s*$/,           // Single decimal: "5.5"
+                /(\d+)\s*$/                      // Whole number at end: "5"
+            ];
 
             lines.forEach(line => {
-                const match = line.match(pricePattern);
-                if (match) {
-                    const price = parseFloat(match[1].replace(',', '.'));
-                    if (price > 0 && price < 500) { // Reasonable price range
-                        let name = line.replace(match[0], '').trim();
-                        name = name.replace(/^[\s\-\*\.x\d]+/, '').replace(/[\s\-\*\.]+$/, '').trim();
-                        if (name.length > 1 && name.length < 50) {
-                            items.push({ name, price });
-                        }
+                // Skip common non-item lines
+                const skipWords = ['total', 'subtotal', 'gst', 'tax', 'change', 'cash', 'card', 'visa', 'master', 'nets', 'thank', 'welcome', 'receipt', 'invoice', 'date', 'time', 'tel', 'address'];
+                const lowerLine = line.toLowerCase();
+                if (skipWords.some(word => lowerLine.includes(word))) return;
+
+                let match = null;
+                let price = 0;
+
+                // Try each pattern
+                for (const pattern of pricePatterns) {
+                    match = line.match(pattern);
+                    if (match) {
+                        price = parseFloat(match[1].replace(',', '.'));
+                        if (price > 0 && price < 200) break; // Valid price found
+                        match = null;
+                    }
+                }
+
+                if (match && price > 0 && price < 200) {
+                    let name = line.replace(match[0], '').trim();
+                    // Clean up the name
+                    name = name.replace(/^[\s\-\*\.x\d\$S]+/i, '').replace(/[\s\-\*\.\$]+$/, '').trim();
+                    name = name.replace(/\s+/g, ' '); // Normalize spaces
+
+                    if (name.length >= 1 && name.length < 60) {
+                        items.push({ name: name || `Item $${price.toFixed(2)}`, price });
+                    } else if (price >= 1) {
+                        // If no name but valid price, still add it
+                        items.push({ name: `Item $${price.toFixed(2)}`, price });
                     }
                 }
             });
 
+            console.log('Extracted items:', items); // Debug output
             return items;
+        }
+
+        // Manual entry fallback - show raw OCR text for user to copy
+        function showRawOcrText(text) {
+            const cleanText = text.replace(/\n+/g, '\n').trim();
+            alert('OCR Result (copy items manually):\n\n' + cleanText);
         }
 
         // Initialize
