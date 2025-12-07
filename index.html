@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayNow Lunch Splitter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-title .icon {
+            font-size: 20px;
+        }
+        
+        /* People Section */
+        .people-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .person-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .person-tag .remove {
+            cursor: pointer;
+            opacity: 0.8;
+            font-size: 16px;
+        }
+        
+        .person-tag .remove:hover {
+            opacity: 1;
+        }
+        
+        .add-person-row {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .add-person-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .add-person-input:focus {
+            border-color: #7B2D8E;
+        }
+        
+        .add-btn {
+            padding: 10px 16px;
+            background: #7B2D8E;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .add-btn:hover {
+            background: #5a1f6a;
+        }
+        
+        /* Items Section */
+        .item-row {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .item-main {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .item-name {
+            flex: 2;
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+        }
+        
+        .item-name:focus {
+            border-color: #7B2D8E;
+        }
+        
+        .item-price {
+            width: 100px;
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            text-align: right;
+            background: white;
+        }
+        
+        .item-price:focus {
+            border-color: #7B2D8E;
+        }
+        
+        .remove-item-btn {
+            width: 38px;
+            height: 38px;
+            border: none;
+            background: #fee;
+            color: #e74c3c;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        
+        .remove-item-btn:hover {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .item-people {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .item-people-label {
+            font-size: 12px;
+            color: #888;
+            width: 100%;
+            margin-bottom: 4px;
+        }
+        
+        .person-checkbox {
+            display: none;
+        }
+        
+        .person-label {
+            padding: 6px 12px;
+            background: #e9ecef;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        
+        .person-checkbox:checked + .person-label {
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            color: white;
+        }
+        
+        .add-item-btn {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #ccc;
+            background: transparent;
+            border-radius: 8px;
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .add-item-btn:hover {
+            border-color: #7B2D8E;
+            color: #7B2D8E;
+        }
+        
+        /* Options */
+        .options-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .option-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .option-label span:first-child {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .option-label span:last-child {
+            display: block;
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+        }
+        
+        .option-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .rate-input {
+            width: 55px;
+            padding: 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: center;
+            outline: none;
+        }
+        
+        .rate-input:focus {
+            border-color: #7B2D8E;
+        }
+        
+        .switch {
+            position: relative;
+            width: 46px;
+            height: 26px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        
+        .discount-input {
+            width: 70px;
+            padding: 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: right;
+            outline: none;
+        }
+        
+        .discount-type {
+            padding: 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+        }
+        
+        /* Summary */
+        .bill-summary {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .summary-row.total {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            border-top: 2px solid #ddd;
+            padding-top: 12px;
+            margin-top: 8px;
+        }
+        
+        .negative {
+            color: #28a745;
+        }
+        
+        /* Person Breakdown */
+        .person-breakdown {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        
+        .person-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            color: white;
+            cursor: pointer;
+        }
+        
+        .person-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .person-total {
+            font-weight: 700;
+            font-size: 18px;
+        }
+        
+        .person-details {
+            padding: 12px 16px;
+            background: white;
+            display: none;
+        }
+        
+        .person-details.show {
+            display: block;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .detail-row.item {
+            color: #333;
+        }
+        
+        .detail-row .shared {
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .generate-person-btn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .generate-person-btn:hover {
+            opacity: 0.9;
+        }
+        
+        /* QR Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 350px;
+            width: 100%;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .modal-subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        
+        .qr-wrapper {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+        
+        #qrcode {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .qr-amount {
+            font-size: 32px;
+            font-weight: 700;
+            color: #7B2D8E;
+        }
+        
+        .qr-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .qr-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .qr-btn.download {
+            background: #28a745;
+            color: white;
+        }
+        
+        .qr-btn.close {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .phone-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 16px;
+        }
+        
+        .no-items {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+            font-style: italic;
+        }
+
+        .shared-items-note {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🍜 PayNow Splitter</h1>
+            <p>Each person pays for their own items</p>
+        </div>
+        
+        <!-- People -->
+        <div class="card">
+            <div class="card-title"><span class="icon">👥</span> Who's Eating?</div>
+            <div class="people-list" id="peopleList"></div>
+            <div class="add-person-row">
+                <input type="text" class="add-person-input" id="newPersonName" placeholder="Enter name" onkeypress="if(event.key==='Enter')addPerson()">
+                <button class="add-btn" onclick="addPerson()">+ Add</button>
+            </div>
+        </div>
+        
+        <!-- Items -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🍽️</span> What's Ordered?</div>
+            <div id="itemsList"></div>
+            <button class="add-item-btn" onclick="addItem()">+ Add Item</button>
+        </div>
+        
+        <!-- Options -->
+        <div class="card">
+            <div class="card-title"><span class="icon">⚙️</span> Bill Options</div>
+            <div class="options-grid">
+                <div class="option-row">
+                    <div class="option-label">
+                        <span>Service Charge</span>
+                        <span>Before GST</span>
+                    </div>
+                    <div class="option-controls">
+                        <input type="number" class="rate-input" id="serviceRate" value="10" min="0" max="100" step="0.5" oninput="calculate()">
+                        <span>%</span>
+                        <label class="switch">
+                            <input type="checkbox" id="hasService" onchange="calculate()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="option-row">
+                    <div class="option-label">
+                        <span>Discount</span>
+                        <span>Before GST</span>
+                    </div>
+                    <div class="option-controls">
+                        <input type="number" class="discount-input" id="discountValue" placeholder="0" step="0.01" oninput="calculate()">
+                        <select class="discount-type" id="discountType" onchange="calculate()">
+                            <option value="amount">S$</option>
+                            <option value="percent">%</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="option-row">
+                    <div class="option-label">
+                        <span>GST</span>
+                        <span>After svc & discount</span>
+                    </div>
+                    <div class="option-controls">
+                        <input type="number" class="rate-input" id="gstRate" value="9" min="0" max="100" step="0.5" oninput="calculate()">
+                        <span>%</span>
+                        <label class="switch">
+                            <input type="checkbox" id="hasGST" checked onchange="calculate()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Summary -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🧾</span> Bill Summary</div>
+            <div class="bill-summary">
+                <div class="summary-row">
+                    <span>Subtotal</span>
+                    <span id="subtotalDisplay">S$ 0.00</span>
+                </div>
+                <div class="summary-row" id="serviceRow" style="display: none;">
+                    <span>Service Charge (<span id="svcPct">10</span>%)</span>
+                    <span id="serviceDisplay">S$ 0.00</span>
+                </div>
+                <div class="summary-row" id="discountRow" style="display: none;">
+                    <span>Discount</span>
+                    <span class="negative" id="discountDisplay">-S$ 0.00</span>
+                </div>
+                <div class="summary-row" id="gstRow">
+                    <span>GST (<span id="gstPct">9</span>%)</span>
+                    <span id="gstDisplay">S$ 0.00</span>
+                </div>
+                <div class="summary-row total">
+                    <span>Total</span>
+                    <span id="totalDisplay">S$ 0.00</span>
+                </div>
+            </div>
+            
+            <div class="card-title"><span class="icon">💰</span> Each Person Pays</div>
+            <div id="breakdownList">
+                <div class="no-items">Add people and items to see breakdown</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- QR Modal -->
+    <div class="modal-overlay" id="qrModal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title" id="modalName">Person Name</div>
+            <div class="modal-subtitle">Scan to pay your share</div>
+            <div class="qr-wrapper">
+                <div id="qrcode"></div>
+            </div>
+            <div class="qr-amount" id="modalAmount">S$ 0.00</div>
+            <div class="qr-actions">
+                <button class="qr-btn download" onclick="downloadQR()">📥 Download</button>
+                <button class="qr-btn close" onclick="closeModal()">✕ Close</button>
+            </div>
+            <div class="phone-info">PayNow to +65 8339 9525</div>
+        </div>
+    </div>
+
+    <script>
+        let people = [];
+        let items = [];
+        let itemIdCounter = 0;
+        let qrcode = null;
+        
+        // Initialize with some defaults
+        function init() {
+            addPerson('Me');
+            addItem();
+        }
+        
+        function addPerson(name) {
+            const inputName = name || document.getElementById('newPersonName').value.trim();
+            if (!inputName) return;
+            
+            if (!people.includes(inputName)) {
+                people.push(inputName);
+                renderPeople();
+                renderItems();
+                calculate();
+            }
+            
+            document.getElementById('newPersonName').value = '';
+        }
+        
+        function removePerson(name) {
+            people = people.filter(p => p !== name);
+            // Remove from all items
+            items.forEach(item => {
+                item.people = item.people.filter(p => p !== name);
+            });
+            renderPeople();
+            renderItems();
+            calculate();
+        }
+        
+        function renderPeople() {
+            const list = document.getElementById('peopleList');
+            list.innerHTML = people.map(p => `
+                <div class="person-tag">
+                    ${p}
+                    <span class="remove" onclick="removePerson('${p}')">×</span>
+                </div>
+            `).join('');
+        }
+        
+        function addItem() {
+            items.push({
+                id: itemIdCounter++,
+                name: '',
+                price: 0,
+                people: [...people] // Default: everyone shares
+            });
+            renderItems();
+        }
+        
+        function removeItem(id) {
+            items = items.filter(i => i.id !== id);
+            renderItems();
+            calculate();
+        }
+        
+        function updateItem(id, field, value) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                item[field] = field === 'price' ? (parseFloat(value) || 0) : value;
+                calculate();
+            }
+        }
+        
+        function togglePerson(itemId, person) {
+            const item = items.find(i => i.id === itemId);
+            if (item) {
+                if (item.people.includes(person)) {
+                    item.people = item.people.filter(p => p !== person);
+                } else {
+                    item.people.push(person);
+                }
+                renderItems();
+                calculate();
+            }
+        }
+        
+        function renderItems() {
+            const list = document.getElementById('itemsList');
+            
+            if (items.length === 0) {
+                list.innerHTML = '<div class="no-items">No items added yet</div>';
+                return;
+            }
+            
+            list.innerHTML = items.map(item => `
+                <div class="item-row">
+                    <div class="item-main">
+                        <input type="text" class="item-name" placeholder="Item name" 
+                            value="${item.name}" 
+                            oninput="updateItem(${item.id}, 'name', this.value)">
+                        <input type="number" class="item-price" placeholder="0.00" step="0.01"
+                            value="${item.price || ''}"
+                            oninput="updateItem(${item.id}, 'price', this.value)">
+                        <button class="remove-item-btn" onclick="removeItem(${item.id})">×</button>
+                    </div>
+                    <div class="item-people">
+                        <div class="item-people-label">Who's sharing this?</div>
+                        ${people.map(p => `
+                            <input type="checkbox" class="person-checkbox" 
+                                id="item${item.id}_${p}" 
+                                ${item.people.includes(p) ? 'checked' : ''}
+                                onchange="togglePerson(${item.id}, '${p}')">
+                            <label class="person-label" for="item${item.id}_${p}">${p}</label>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function calculate() {
+            // Calculate subtotal
+            let subtotal = 0;
+            items.forEach(item => {
+                subtotal += item.price || 0;
+            });
+            
+            // Service charge
+            const hasService = document.getElementById('hasService').checked;
+            const serviceRate = parseFloat(document.getElementById('serviceRate').value) || 10;
+            const serviceAmt = hasService ? subtotal * (serviceRate / 100) : 0;
+            
+            // Discount
+            const discountValue = parseFloat(document.getElementById('discountValue').value) || 0;
+            const discountType = document.getElementById('discountType').value;
+            let discountAmt = 0;
+            if (discountType === 'percent') {
+                discountAmt = subtotal * (discountValue / 100);
+            } else {
+                discountAmt = discountValue;
+            }
+            
+            // Taxable
+            const taxable = subtotal + serviceAmt - discountAmt;
+            
+            // GST
+            const hasGST = document.getElementById('hasGST').checked;
+            const gstRate = parseFloat(document.getElementById('gstRate').value) || 9;
+            const gstAmt = hasGST ? taxable * (gstRate / 100) : 0;
+            
+            // Total
+            const total = taxable + gstAmt;
+            
+            // Update summary display
+            document.getElementById('subtotalDisplay').textContent = `S$ ${subtotal.toFixed(2)}`;
+            document.getElementById('svcPct').textContent = serviceRate;
+            document.getElementById('serviceRow').style.display = hasService ? 'flex' : 'none';
+            document.getElementById('serviceDisplay').textContent = `S$ ${serviceAmt.toFixed(2)}`;
+            document.getElementById('discountRow').style.display = discountAmt > 0 ? 'flex' : 'none';
+            document.getElementById('discountDisplay').textContent = `-S$ ${discountAmt.toFixed(2)}`;
+            document.getElementById('gstPct').textContent = gstRate;
+            document.getElementById('gstRow').style.display = hasGST ? 'flex' : 'none';
+            document.getElementById('gstDisplay').textContent = `S$ ${gstAmt.toFixed(2)}`;
+            document.getElementById('totalDisplay').textContent = `S$ ${total.toFixed(2)}`;
+            
+            // Calculate per-person breakdown
+            calculatePersonBreakdown(subtotal, serviceAmt, discountAmt, gstAmt, total);
+        }
+        
+        function calculatePersonBreakdown(subtotal, serviceAmt, discountAmt, gstAmt, total) {
+            const breakdownList = document.getElementById('breakdownList');
+            
+            if (people.length === 0) {
+                breakdownList.innerHTML = '<div class="no-items">Add people to see breakdown</div>';
+                return;
+            }
+            
+            // Calculate each person's share
+            const personData = people.map(person => {
+                // Get items for this person
+                const personItems = items.filter(item => item.people.includes(person));
+                
+                // Calculate their subtotal (split shared items)
+                let personSubtotal = 0;
+                const itemDetails = [];
+                
+                personItems.forEach(item => {
+                    const shareCount = item.people.length || 1;
+                    const share = (item.price || 0) / shareCount;
+                    personSubtotal += share;
+                    if (item.price > 0) {
+                        itemDetails.push({
+                            name: item.name || 'Item',
+                            price: item.price,
+                            share: share,
+                            shared: shareCount > 1 ? shareCount : 0
+                        });
+                    }
+                });
+                
+                // Calculate proportion of extras
+                const proportion = subtotal > 0 ? personSubtotal / subtotal : 0;
+                const personService = serviceAmt * proportion;
+                const personDiscount = discountAmt * proportion;
+                const personGst = gstAmt * proportion;
+                const personTotal = personSubtotal + personService - personDiscount + personGst;
+                
+                return {
+                    name: person,
+                    items: itemDetails,
+                    subtotal: personSubtotal,
+                    service: personService,
+                    discount: personDiscount,
+                    gst: personGst,
+                    total: personTotal
+                };
+            });
+            
+            // Render breakdown
+            breakdownList.innerHTML = personData.map((p, idx) => `
+                <div class="person-breakdown">
+                    <div class="person-header" onclick="toggleDetails(${idx})">
+                        <span class="person-name">${p.name}</span>
+                        <span class="person-total">S$ ${p.total.toFixed(2)}</span>
+                    </div>
+                    <div class="person-details" id="details${idx}">
+                        ${p.items.length > 0 ? p.items.map(item => `
+                            <div class="detail-row item">
+                                <span>${item.name} ${item.shared > 1 ? `<span class="shared">(÷${item.shared})</span>` : ''}</span>
+                                <span>S$ ${item.share.toFixed(2)}</span>
+                            </div>
+                        `).join('') : '<div class="detail-row"><span>No items</span><span>S$ 0.00</span></div>'}
+                        ${p.service > 0 ? `<div class="detail-row"><span>Service</span><span>S$ ${p.service.toFixed(2)}</span></div>` : ''}
+                        ${p.discount > 0 ? `<div class="detail-row"><span>Discount</span><span class="negative">-S$ ${p.discount.toFixed(2)}</span></div>` : ''}
+                        ${p.gst > 0 ? `<div class="detail-row"><span>GST</span><span>S$ ${p.gst.toFixed(2)}</span></div>` : ''}
+                        <button class="generate-person-btn" onclick="generateQR('${p.name}', ${p.total.toFixed(2)})">
+                            Generate PayNow QR
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function toggleDetails(idx) {
+            const details = document.getElementById(`details${idx}`);
+            details.classList.toggle('show');
+        }
+        
+        // PayNow QR Generation
+        function calculateCRC(str) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < str.length; i++) {
+                crc ^= str.charCodeAt(i) << 8;
+                for (let j = 0; j < 8; j++) {
+                    crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+                }
+            }
+            return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+        }
+        
+        function tlv(tag, value) {
+            return tag + value.length.toString().padStart(2, '0') + value;
+        }
+        
+        function generatePayNowString(amount, reference) {
+            let merchantAcctInfo = '';
+            merchantAcctInfo += tlv('00', 'SG.PAYNOW');
+            merchantAcctInfo += tlv('01', '0');
+            merchantAcctInfo += tlv('02', '+6583399525');
+            merchantAcctInfo += tlv('03', '1');
+            
+            let payload = '';
+            payload += tlv('00', '01');
+            payload += tlv('01', '12');
+            payload += tlv('26', merchantAcctInfo);
+            payload += tlv('52', '0000');
+            payload += tlv('53', '702');
+            
+            if (amount && parseFloat(amount) > 0) {
+                payload += tlv('54', parseFloat(amount).toFixed(2));
+            }
+            
+            payload += tlv('58', 'SG');
+            payload += tlv('59', 'NA');
+            payload += tlv('60', 'Singapore');
+            
+            if (reference && reference.trim()) {
+                payload += tlv('62', tlv('01', reference.trim().substring(0, 25)));
+            }
+            
+            payload += '6304';
+            payload += calculateCRC(payload);
+            
+            return payload;
+        }
+        
+        function generateQR(name, amount) {
+            const qrDiv = document.getElementById('qrcode');
+            qrDiv.innerHTML = '';
+            
+            const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const reference = `${name} ${today}`;
+            const payNowString = generatePayNowString(amount, reference);
+            
+            qrcode = new QRCode(qrDiv, {
+                text: payNowString,
+                width: 180,
+                height: 180,
+                colorDark: '#7B2D8E',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            
+            document.getElementById('modalName').textContent = name;
+            document.getElementById('modalAmount').textContent = `S$ ${parseFloat(amount).toFixed(2)}`;
+            document.getElementById('qrModal').classList.add('show');
+        }
+        
+        function closeModal(event) {
+            if (!event || event.target === document.getElementById('qrModal')) {
+                document.getElementById('qrModal').classList.remove('show');
+            }
+        }
+        
+        function downloadQR() {
+            const canvas = document.querySelector('#qrcode canvas');
+            if (canvas) {
+                const name = document.getElementById('modalName').textContent;
+                const link = document.createElement('a');
+                link.download = `paynow-${name.toLowerCase().replace(/\s+/g, '-')}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+        
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
