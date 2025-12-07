@@ -1978,8 +1978,8 @@
                 const result = await response.json();
                 console.log('API Response:', result);
 
-                // Parse the split_result from the API
-                const splitResult = result.split_result || result.data?.split_result || '';
+                // Parse the split_result from the API response
+                const splitResult = result.data?.outputs?.split_result || result.split_result || '';
                 const extracted = parseInseaResult(splitResult);
 
                 if (extracted.length > 0) {
