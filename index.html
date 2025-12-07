@@ -1237,9 +1237,8 @@
         let qrcode = null;
         let savedTeam = [];
         let splitHistory = [];
-        let tesseractLoaded = false;
         let paidStatus = {}; // Track who has paid
-        let pendingOcrItems = []; // Items pending from OCR preview
+        let pendingOcrItems = []; // Items pending from receipt scan
 
         // LocalStorage keys
         const TEAM_KEY = 'paynow_team';
@@ -1943,7 +1942,10 @@
             }
         }
 
-        // ==================== OCR (Receipt Scanning) ====================
+        // ==================== Receipt Scanning (ai.insea.io API) ====================
+
+        const INSEA_API_KEY = 'yz1PZMqqNAQRVXeOmie0gkaDft9I2l0R';
+        const INSEA_API_URL = 'https://ai.insea.io/api/workflows/10902/run';
 
         // Handle receipt upload
         async function handleReceiptUpload(event) {
@@ -1952,27 +1954,33 @@
 
             const status = document.getElementById('ocrStatus');
             status.className = 'ocr-status show';
-            status.textContent = 'Loading OCR engine...';
+            status.textContent = 'Uploading receipt...';
 
             try {
-                // Load Tesseract.js on demand
-                if (!tesseractLoaded) {
-                    await loadTesseract();
-                    tesseractLoaded = true;
-                }
+                // Create FormData and send to ai.insea.io
+                const formData = new FormData();
+                formData.append('receipt_image', file);
 
-                status.textContent = 'Scanning receipt...';
+                status.textContent = 'Analyzing receipt with AI...';
 
-                const result = await Tesseract.recognize(file, 'eng', {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            status.textContent = `Scanning... ${Math.round(m.progress * 100)}%`;
-                        }
-                    }
+                const response = await fetch(INSEA_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${INSEA_API_KEY}`
+                    },
+                    body: formData
                 });
 
-                const text = result.data.text;
-                const extracted = extractItemsFromText(text);
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('API Response:', result);
+
+                // Parse the split_result from the API
+                const splitResult = result.split_result || result.data?.split_result || '';
+                const extracted = parseInseaResult(splitResult);
 
                 if (extracted.length > 0) {
                     // Show preview instead of adding directly
@@ -1981,15 +1989,45 @@
                     setTimeout(() => { status.className = 'ocr-status'; }, 3000);
                 } else {
                     status.className = 'ocr-status show error';
-                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${text.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
+                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${splitResult.replace(/`/g, "'").replace(/\\/g, "\\\\").replace(/\n/g, "\\n")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
                 }
             } catch (e) {
-                console.error('OCR error:', e);
+                console.error('API error:', e);
                 status.className = 'ocr-status show error';
-                status.textContent = 'Error scanning receipt. Please try again.';
+                status.textContent = 'Error analyzing receipt. Please try again.';
             }
 
             event.target.value = '';
+        }
+
+        // Parse the ai.insea.io result format
+        function parseInseaResult(text) {
+            console.log('Parsing result:', text);
+            const items = [];
+
+            // Match lines like: "1. Thai Style Fried Tang Hoon - $9.00"
+            // Or: "- **Subtotal**: $82.20" (skip these summary lines)
+            const itemPattern = /^\d+\.\s*(.+?)\s*-\s*\$?([\d.]+)\s*$/gm;
+
+            let match;
+            while ((match = itemPattern.exec(text)) !== null) {
+                let name = match[1].trim();
+                const price = parseFloat(match[2]);
+
+                // Clean up name - remove ** markers
+                name = name.replace(/\*\*/g, '').trim();
+
+                // Skip if it looks like a summary line
+                const skipWords = ['subtotal', 'total', 'discount', 'gst', 'tax', 'service', 'rounding', 'grand'];
+                if (skipWords.some(word => name.toLowerCase().includes(word))) continue;
+
+                if (price > 0 && price < 200 && name.length > 0) {
+                    items.push({ name, price });
+                }
+            }
+
+            console.log('Extracted items:', items);
+            return items;
         }
 
         // Show OCR preview modal
@@ -2053,76 +2091,10 @@
             showToast(`Added ${selected.length} items`);
         }
 
-        // Load Tesseract.js dynamically
-        function loadTesseract() {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
-        }
-
-        // Extract items and prices from OCR text
-        function extractItemsFromText(text) {
-            console.log('OCR Raw Text:', text); // Debug output
-            const lines = text.split('\n').filter(l => l.trim());
-            const items = [];
-
-            // Multiple price patterns to catch different formats
-            const pricePatterns = [
-                /(\d+[.,]\d{2})\s*$/,           // Price at end: "Chicken Rice 5.50"
-                /^\s*(\d+[.,]\d{2})/,           // Price at start: "5.50 Chicken Rice"
-                /\$\s*(\d+[.,]\d{2})/,          // With dollar sign: "$5.50"
-                /S\$\s*(\d+[.,]\d{2})/i,        // Singapore dollar: "S$5.50"
-                /(\d+[.,]\d{2})/,               // Any decimal number
-                /(\d+[.,]\d{1})\s*$/,           // Single decimal: "5.5"
-                /(\d+)\s*$/                      // Whole number at end: "5"
-            ];
-
-            lines.forEach(line => {
-                // Skip common non-item lines
-                const skipWords = ['total', 'subtotal', 'gst', 'tax', 'change', 'cash', 'card', 'visa', 'master', 'nets', 'thank', 'welcome', 'receipt', 'invoice', 'date', 'time', 'tel', 'address'];
-                const lowerLine = line.toLowerCase();
-                if (skipWords.some(word => lowerLine.includes(word))) return;
-
-                let match = null;
-                let price = 0;
-
-                // Try each pattern
-                for (const pattern of pricePatterns) {
-                    match = line.match(pattern);
-                    if (match) {
-                        price = parseFloat(match[1].replace(',', '.'));
-                        if (price > 0 && price < 200) break; // Valid price found
-                        match = null;
-                    }
-                }
-
-                if (match && price > 0 && price < 200) {
-                    let name = line.replace(match[0], '').trim();
-                    // Clean up the name
-                    name = name.replace(/^[\s\-\*\.x\d\$S]+/i, '').replace(/[\s\-\*\.\$]+$/, '').trim();
-                    name = name.replace(/\s+/g, ' '); // Normalize spaces
-
-                    if (name.length >= 1 && name.length < 60) {
-                        items.push({ name: name || `Item $${price.toFixed(2)}`, price });
-                    } else if (price >= 1) {
-                        // If no name but valid price, still add it
-                        items.push({ name: `Item $${price.toFixed(2)}`, price });
-                    }
-                }
-            });
-
-            console.log('Extracted items:', items); // Debug output
-            return items;
-        }
-
-        // Manual entry fallback - show raw OCR text for user to copy
+        // Manual entry fallback - show raw API result for user to copy
         function showRawOcrText(text) {
-            const cleanText = text.replace(/\n+/g, '\n').trim();
-            alert('OCR Result (copy items manually):\n\n' + cleanText);
+            const cleanText = text.replace(/\\n/g, '\n').replace(/\n+/g, '\n').trim();
+            alert('API Result (copy items manually):\n\n' + cleanText);
         }
 
         // Initialize
