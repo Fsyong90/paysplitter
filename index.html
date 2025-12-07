@@ -1239,13 +1239,17 @@
                     <span>Subtotal</span>
                     <span id="subtotalDisplay">S$ 0.00</span>
                 </div>
-                <div class="summary-row" id="serviceRow" style="display: none;">
-                    <span>Service Charge (<span id="svcPct">10</span>%)</span>
-                    <span id="serviceDisplay">S$ 0.00</span>
-                </div>
                 <div class="summary-row" id="discountRow" style="display: none;">
                     <span>Discount</span>
                     <span class="negative" id="discountDisplay">-S$ 0.00</span>
+                </div>
+                <div class="summary-row" id="subtotalAfterDiscountRow" style="display: none;">
+                    <span>After Discount</span>
+                    <span id="subtotalAfterDiscountDisplay">S$ 0.00</span>
+                </div>
+                <div class="summary-row" id="serviceRow" style="display: none;">
+                    <span>Service (<span id="svcPct">10</span>%)</span>
+                    <span id="serviceDisplay">S$ 0.00</span>
                 </div>
                 <div class="summary-row" id="gstRow">
                     <span>GST (<span id="gstPct">9</span>%)</span>
@@ -1591,12 +1595,7 @@
                 subtotal += item.price || 0;
             });
 
-            // Service charge
-            const hasService = document.getElementById('hasService').checked;
-            const serviceRate = parseFloat(document.getElementById('serviceRate').value) || 10;
-            const serviceAmt = hasService ? subtotal * (serviceRate / 100) : 0;
-
-            // Discount
+            // 1. Discount FIRST (applied to subtotal)
             const discountValue = parseFloat(document.getElementById('discountValue').value) || 0;
             const discountType = document.getElementById('discountType').value;
             let discountAmt = 0;
@@ -1606,10 +1605,16 @@
                 discountAmt = discountValue;
             }
 
-            // Taxable
-            const taxable = subtotal + serviceAmt - discountAmt;
+            // Subtotal after discount
+            const subtotalAfterDiscount = subtotal - discountAmt;
 
-            // GST
+            // 2. Service charge (applied AFTER discount)
+            const hasService = document.getElementById('hasService').checked;
+            const serviceRate = parseFloat(document.getElementById('serviceRate').value) || 10;
+            const serviceAmt = hasService ? subtotalAfterDiscount * (serviceRate / 100) : 0;
+
+            // 3. GST (applied to subtotal after discount + service)
+            const taxable = subtotalAfterDiscount + serviceAmt;
             const hasGST = document.getElementById('hasGST').checked;
             const gstRate = parseFloat(document.getElementById('gstRate').value) || 9;
             const gstAmt = hasGST ? taxable * (gstRate / 100) : 0;
@@ -1619,11 +1624,13 @@
 
             // Update summary display
             document.getElementById('subtotalDisplay').textContent = `S$ ${subtotal.toFixed(2)}`;
+            document.getElementById('discountRow').style.display = discountAmt > 0 ? 'flex' : 'none';
+            document.getElementById('discountDisplay').textContent = `-S$ ${discountAmt.toFixed(2)}`;
+            document.getElementById('subtotalAfterDiscountRow').style.display = discountAmt > 0 ? 'flex' : 'none';
+            document.getElementById('subtotalAfterDiscountDisplay').textContent = `S$ ${subtotalAfterDiscount.toFixed(2)}`;
             document.getElementById('svcPct').textContent = serviceRate;
             document.getElementById('serviceRow').style.display = hasService ? 'flex' : 'none';
             document.getElementById('serviceDisplay').textContent = `S$ ${serviceAmt.toFixed(2)}`;
-            document.getElementById('discountRow').style.display = discountAmt > 0 ? 'flex' : 'none';
-            document.getElementById('discountDisplay').textContent = `-S$ ${discountAmt.toFixed(2)}`;
             document.getElementById('gstPct').textContent = gstRate;
             document.getElementById('gstRow').style.display = hasGST ? 'flex' : 'none';
             document.getElementById('gstDisplay').textContent = `S$ ${gstAmt.toFixed(2)}`;
@@ -1709,20 +1716,21 @@
                     }
                 });
                 
-                // Calculate proportion of extras
+                // Calculate proportion of extras (discount first, then service on discounted amount)
                 const proportion = subtotal > 0 ? personSubtotal / subtotal : 0;
-                const personService = serviceAmt * proportion;
                 const personDiscount = discountAmt * proportion;
+                const personSubtotalAfterDiscount = personSubtotal - personDiscount;
+                const personService = serviceAmt * proportion;
                 const personGst = gstAmt * proportion;
-                const exactTotal = personSubtotal + personService - personDiscount + personGst;
+                const exactTotal = personSubtotalAfterDiscount + personService + personGst;
                 const personTotal = roundAmount(exactTotal);
 
                 return {
                     name: person,
                     items: itemDetails,
                     subtotal: personSubtotal,
-                    service: personService,
                     discount: personDiscount,
+                    service: personService,
                     gst: personGst,
                     exactTotal: exactTotal,
                     total: personTotal
