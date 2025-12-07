@@ -74,20 +74,27 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 8px 12px;
+            padding: 10px 14px;
             background: linear-gradient(135deg, #7B2D8E, #E91E8C);
             color: white;
             border-radius: 20px;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 500;
+            min-height: 44px;
         }
-        
+
         .person-tag .remove {
             cursor: pointer;
             opacity: 0.8;
-            font-size: 16px;
+            font-size: 20px;
+            padding: 4px;
+            min-width: 28px;
+            min-height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        
+
         .person-tag .remove:hover {
             opacity: 1;
         }
@@ -99,28 +106,31 @@
         
         .add-person-input {
             flex: 1;
-            padding: 10px 14px;
+            padding: 12px 14px;
             border: 2px solid #e9ecef;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 16px;
             outline: none;
+            min-height: 48px;
         }
-        
+
         .add-person-input:focus {
             border-color: #7B2D8E;
         }
-        
+
         .add-btn {
-            padding: 10px 16px;
+            padding: 12px 20px;
             background: #7B2D8E;
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
+            min-height: 48px;
+            min-width: 80px;
         }
-        
+
         .add-btn:hover {
             background: #5a1f6a;
         }
@@ -131,55 +141,70 @@
             border-radius: 12px;
             padding: 14px;
             margin-bottom: 10px;
+            position: relative;
+            transition: transform 0.2s, opacity 0.2s;
         }
-        
+
+        .item-row.swiping {
+            transform: translateX(-80px);
+        }
+
+        .item-row.removing {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
         .item-main {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 10px;
+            align-items: center;
         }
-        
+
         .item-name {
             flex: 2;
-            padding: 10px 12px;
+            padding: 12px;
             border: 2px solid #e9ecef;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 16px;
             outline: none;
             background: white;
+            min-height: 48px;
         }
-        
+
         .item-name:focus {
             border-color: #7B2D8E;
         }
-        
+
         .item-price {
-            width: 100px;
-            padding: 10px 12px;
+            width: 90px;
+            padding: 12px 8px;
             border: 2px solid #e9ecef;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 16px;
             outline: none;
             text-align: right;
             background: white;
+            min-height: 48px;
         }
-        
+
         .item-price:focus {
             border-color: #7B2D8E;
         }
-        
+
         .remove-item-btn {
-            width: 38px;
-            height: 38px;
+            width: 48px;
+            height: 48px;
             border: none;
             background: #fee;
             color: #e74c3c;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 22px;
+            flex-shrink: 0;
         }
-        
-        .remove-item-btn:hover {
+
+        .remove-item-btn:hover, .remove-item-btn:active {
             background: #e74c3c;
             color: white;
         }
@@ -202,15 +227,18 @@
         }
         
         .person-label {
-            padding: 6px 12px;
+            padding: 10px 14px;
             background: #e9ecef;
-            border-radius: 16px;
-            font-size: 12px;
+            border-radius: 20px;
+            font-size: 14px;
             cursor: pointer;
             transition: all 0.2s;
             user-select: none;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
         }
-        
+
         .person-checkbox:checked + .person-label {
             background: linear-gradient(135deg, #7B2D8E, #E91E8C);
             color: white;
@@ -835,6 +863,161 @@
             background: #ffebee;
             color: #c62828;
         }
+
+        /* Payment tracking */
+        .person-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            color: white;
+            cursor: pointer;
+            min-height: 56px;
+        }
+
+        .person-header.paid {
+            background: linear-gradient(135deg, #1e8449, #27ae60);
+        }
+
+        .paid-btn {
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.5);
+            color: white;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 10px;
+            min-height: 40px;
+            transition: all 0.2s;
+        }
+
+        .paid-btn:hover, .paid-btn:active {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .paid-btn.is-paid {
+            background: white;
+            color: #27ae60;
+            border-color: white;
+        }
+
+        /* Receipt Preview Modal */
+        .preview-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .preview-modal.show {
+            display: block;
+        }
+
+        .preview-content {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+
+        .preview-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .preview-item input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .preview-item-name {
+            flex: 1;
+            font-size: 15px;
+        }
+
+        .preview-item-price {
+            font-weight: 600;
+            color: #7B2D8E;
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .preview-btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 50px;
+        }
+
+        .preview-btn.confirm {
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            color: white;
+        }
+
+        .preview-btn.cancel {
+            background: #e9ecef;
+            color: #666;
+        }
+
+        /* Saved team larger touch targets */
+        .saved-person {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 14px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+            min-height: 44px;
+        }
+
+        .saved-person .delete-saved {
+            margin-left: 6px;
+            opacity: 0.6;
+            font-size: 18px;
+            padding: 4px;
+            min-width: 28px;
+            min-height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -1032,6 +1215,21 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <!-- Receipt Preview Modal -->
+    <div class="preview-modal" id="previewModal">
+        <div class="preview-content">
+            <div class="preview-title">
+                <span>📷 Scanned Items</span>
+                <span id="previewCount">0 items</span>
+            </div>
+            <div id="previewItems"></div>
+            <div class="preview-actions">
+                <button class="preview-btn cancel" onclick="closePreview()">Cancel</button>
+                <button class="preview-btn confirm" onclick="confirmPreview()">Add Selected</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let people = [];
         let items = [];
@@ -1040,6 +1238,8 @@
         let savedTeam = [];
         let splitHistory = [];
         let tesseractLoaded = false;
+        let paidStatus = {}; // Track who has paid
+        let pendingOcrItems = []; // Items pending from OCR preview
 
         // LocalStorage keys
         const TEAM_KEY = 'paynow_team';
@@ -1400,11 +1600,21 @@
             });
             
             // Render breakdown
-            breakdownList.innerHTML = personData.map((p, idx) => `
+            breakdownList.innerHTML = personData.map((p, idx) => {
+                const isPaid = paidStatus[p.name] || false;
+                return `
                 <div class="person-breakdown">
-                    <div class="person-header" onclick="toggleDetails(${idx})">
-                        <span class="person-name">${p.name}</span>
-                        <span class="person-total">S$ ${p.total.toFixed(2)}</span>
+                    <div class="person-header ${isPaid ? 'paid' : ''}" onclick="toggleDetails(${idx})">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="person-name">${p.name}</span>
+                            ${isPaid ? '<span style="font-size: 12px;">✓ Paid</span>' : ''}
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="person-total">S$ ${p.total.toFixed(2)}</span>
+                            <button class="paid-btn ${isPaid ? 'is-paid' : ''}" onclick="event.stopPropagation(); togglePaid('${p.name}')">
+                                ${isPaid ? '✓ Paid' : 'Mark Paid'}
+                            </button>
+                        </div>
                     </div>
                     <div class="person-details" id="details${idx}">
                         ${p.items.length > 0 ? p.items.map(item => `
@@ -1421,7 +1631,14 @@
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
+        }
+
+        // Toggle paid status
+        function togglePaid(name) {
+            paidStatus[name] = !paidStatus[name];
+            calculate();
+            showToast(paidStatus[name] ? `${name} marked as paid` : `${name} marked as unpaid`);
         }
         
         function toggleDetails(idx) {
@@ -1758,17 +1975,9 @@
                 const extracted = extractItemsFromText(text);
 
                 if (extracted.length > 0) {
-                    extracted.forEach(item => {
-                        items.push({
-                            id: itemIdCounter++,
-                            name: item.name,
-                            price: item.price,
-                            people: [...people]
-                        });
-                    });
-                    renderItems();
-                    calculate();
-                    status.textContent = `Found ${extracted.length} items!`;
+                    // Show preview instead of adding directly
+                    showOcrPreview(extracted);
+                    status.textContent = `Found ${extracted.length} items - review below`;
                     setTimeout(() => { status.className = 'ocr-status'; }, 3000);
                 } else {
                     status.className = 'ocr-status show error';
@@ -1781,6 +1990,67 @@
             }
 
             event.target.value = '';
+        }
+
+        // Show OCR preview modal
+        function showOcrPreview(extractedItems) {
+            pendingOcrItems = extractedItems.map((item, idx) => ({
+                ...item,
+                selected: true,
+                id: idx
+            }));
+
+            renderOcrPreview();
+            document.getElementById('previewModal').classList.add('show');
+        }
+
+        // Render OCR preview items
+        function renderOcrPreview() {
+            const container = document.getElementById('previewItems');
+            const selectedCount = pendingOcrItems.filter(i => i.selected).length;
+            document.getElementById('previewCount').textContent = `${selectedCount} selected`;
+
+            container.innerHTML = pendingOcrItems.map(item => `
+                <div class="preview-item">
+                    <input type="checkbox" ${item.selected ? 'checked' : ''}
+                        onchange="toggleOcrItem(${item.id})">
+                    <span class="preview-item-name">${item.name}</span>
+                    <span class="preview-item-price">S$ ${item.price.toFixed(2)}</span>
+                </div>
+            `).join('');
+        }
+
+        // Toggle OCR item selection
+        function toggleOcrItem(id) {
+            const item = pendingOcrItems.find(i => i.id === id);
+            if (item) {
+                item.selected = !item.selected;
+                renderOcrPreview();
+            }
+        }
+
+        // Close preview modal
+        function closePreview() {
+            document.getElementById('previewModal').classList.remove('show');
+            pendingOcrItems = [];
+        }
+
+        // Confirm and add selected OCR items
+        function confirmPreview() {
+            const selected = pendingOcrItems.filter(i => i.selected);
+            selected.forEach(item => {
+                items.push({
+                    id: itemIdCounter++,
+                    name: item.name,
+                    price: item.price,
+                    people: [...people]
+                });
+            });
+
+            renderItems();
+            calculate();
+            closePreview();
+            showToast(`Added ${selected.length} items`);
         }
 
         // Load Tesseract.js dynamically
