@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PayNow Lunch Splitter</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -1120,6 +1123,95 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* Team Code Section */
+        .team-code-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .team-code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .team-code-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .team-code-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .team-code-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            outline: none;
+        }
+
+        .team-code-input:focus {
+            border-color: #7B2D8E;
+        }
+
+        .team-code-btn {
+            padding: 10px 16px;
+            background: #7B2D8E;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .team-code-btn:hover {
+            background: #5a1f6a;
+        }
+
+        .team-code-btn.leave {
+            background: #e74c3c;
+        }
+
+        .team-code-status {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #28a745;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .team-code-status.syncing {
+            color: #f39c12;
+        }
+
+        .sync-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: #d4edda;
+            color: #155724;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .sync-indicator.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </head>
 <body>
@@ -1137,6 +1229,21 @@
 
         <!-- Split Bill Tab -->
         <div class="tab-content active" id="tab-split">
+
+        <!-- Team Code -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🔗</span> Team Sync</div>
+            <div class="team-code-section" id="teamCodeSection">
+                <div class="team-code-header">
+                    <span class="team-code-label">Enter a team code to sync with your teammates</span>
+                </div>
+                <div class="team-code-input-row" id="teamCodeInputRow">
+                    <input type="text" class="team-code-input" id="teamCodeInput" placeholder="e.g., LUNCH2024" maxlength="20">
+                    <button class="team-code-btn" onclick="joinTeam()">Join</button>
+                </div>
+                <div class="team-code-status" id="teamCodeStatus" style="display: none;"></div>
+            </div>
+        </div>
 
         <!-- People -->
         <div class="card">
@@ -1360,17 +1467,190 @@
         // LocalStorage keys
         const TEAM_KEY = 'paynow_team';
         const HISTORY_KEY = 'paynow_history';
+        const TEAM_CODE_KEY = 'paynow_team_code';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyA8bj45ygxLjMiWH-iNdqzNJeXmU_mG5dY",
+            authDomain: "paysplitter-16bd6.firebaseapp.com",
+            projectId: "paysplitter-16bd6",
+            storageBucket: "paysplitter-16bd6.firebasestorage.app",
+            messagingSenderId: "906740214966",
+            appId: "1:906740214966:web:139c8b63ee599484474a17"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Team code for syncing
+        let currentTeamCode = null;
+        let unsubscribeTeam = null;
+        let unsubscribeHistory = null;
 
         // Initialize
         function init() {
             loadSavedTeam();
             loadHistory();
+            loadTeamCode();
             checkUrlParams();
             if (people.length === 0) {
                 addItem();
             }
             renderSavedTeam();
             renderHistory();
+            renderTeamCodeUI();
+        }
+
+        // Load team code from localStorage and connect
+        function loadTeamCode() {
+            const savedCode = localStorage.getItem(TEAM_CODE_KEY);
+            if (savedCode) {
+                currentTeamCode = savedCode;
+                connectToTeam(savedCode);
+            }
+        }
+
+        // Join a team by code
+        async function joinTeam() {
+            const input = document.getElementById('teamCodeInput');
+            const code = input.value.trim().toUpperCase();
+
+            if (!code || code.length < 3) {
+                showToast('Please enter a valid team code (min 3 characters)');
+                return;
+            }
+
+            try {
+                // Save to localStorage
+                localStorage.setItem(TEAM_CODE_KEY, code);
+                currentTeamCode = code;
+
+                // Create team doc if doesn't exist
+                const teamRef = db.collection('teams').doc(code);
+                const teamDoc = await teamRef.get();
+
+                if (!teamDoc.exists) {
+                    // Create new team with current data
+                    await teamRef.set({
+                        teammates: savedTeam,
+                        history: splitHistory,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast(`Created team: ${code}`);
+                } else {
+                    showToast(`Joined team: ${code}`);
+                }
+
+                // Connect to real-time updates
+                connectToTeam(code);
+                renderTeamCodeUI();
+
+            } catch (e) {
+                console.error('Error joining team:', e);
+                showToast('Error connecting to team');
+            }
+        }
+
+        // Leave current team
+        function leaveTeam() {
+            if (unsubscribeTeam) unsubscribeTeam();
+            if (unsubscribeHistory) unsubscribeHistory();
+
+            localStorage.removeItem(TEAM_CODE_KEY);
+            currentTeamCode = null;
+
+            renderTeamCodeUI();
+            showToast('Left team - now using local storage only');
+        }
+
+        // Connect to team for real-time updates
+        function connectToTeam(code) {
+            // Unsubscribe from previous listeners
+            if (unsubscribeTeam) unsubscribeTeam();
+            if (unsubscribeHistory) unsubscribeHistory();
+
+            const teamRef = db.collection('teams').doc(code);
+
+            // Listen for teammate changes
+            unsubscribeTeam = teamRef.onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.teammates) {
+                        savedTeam = data.teammates;
+                        localStorage.setItem(TEAM_KEY, JSON.stringify(savedTeam));
+                        renderSavedTeam();
+                    }
+                    if (data.history) {
+                        splitHistory = data.history;
+                        localStorage.setItem(HISTORY_KEY, JSON.stringify(splitHistory));
+                        renderHistory();
+                    }
+                    updateSyncStatus('synced');
+                }
+            }, (error) => {
+                console.error('Firestore error:', error);
+                updateSyncStatus('offline');
+            });
+        }
+
+        // Update sync status indicator
+        function updateSyncStatus(status) {
+            const statusEl = document.getElementById('teamCodeStatus');
+            if (status === 'synced') {
+                statusEl.innerHTML = '<span class="sync-indicator">✓ Synced</span> Team data is shared with teammates';
+            } else if (status === 'offline') {
+                statusEl.innerHTML = '<span class="sync-indicator offline">⚠ Offline</span> Using local data';
+            }
+        }
+
+        // Render team code UI based on connection state
+        function renderTeamCodeUI() {
+            const inputRow = document.getElementById('teamCodeInputRow');
+            const status = document.getElementById('teamCodeStatus');
+            const label = document.querySelector('.team-code-label');
+
+            if (currentTeamCode) {
+                inputRow.innerHTML = `
+                    <span style="flex:1; font-weight: 600; color: #7B2D8E; font-size: 16px;">📡 ${currentTeamCode}</span>
+                    <button class="team-code-btn leave" onclick="leaveTeam()">Leave</button>
+                `;
+                label.textContent = 'Connected to team:';
+                status.style.display = 'flex';
+            } else {
+                inputRow.innerHTML = `
+                    <input type="text" class="team-code-input" id="teamCodeInput" placeholder="e.g., LUNCH2024" maxlength="20">
+                    <button class="team-code-btn" onclick="joinTeam()">Join</button>
+                `;
+                label.textContent = 'Enter a team code to sync with your teammates';
+                status.style.display = 'none';
+            }
+        }
+
+        // Override saveTeam to sync to Firebase
+        async function saveTeamToFirebase() {
+            if (!currentTeamCode) return;
+
+            try {
+                await db.collection('teams').doc(currentTeamCode).update({
+                    teammates: savedTeam
+                });
+            } catch (e) {
+                console.error('Error saving team to Firebase:', e);
+            }
+        }
+
+        // Override saveHistory to sync to Firebase
+        async function saveHistoryToFirebase() {
+            if (!currentTeamCode) return;
+
+            try {
+                await db.collection('teams').doc(currentTeamCode).update({
+                    history: splitHistory
+                });
+            } catch (e) {
+                console.error('Error saving history to Firebase:', e);
+            }
         }
 
         // Load saved team from localStorage
@@ -1385,10 +1665,11 @@
             }
         }
 
-        // Save team to localStorage
+        // Save team to localStorage and Firebase
         function saveTeam() {
             try {
                 localStorage.setItem(TEAM_KEY, JSON.stringify(savedTeam));
+                saveTeamToFirebase(); // Sync to Firebase
             } catch (e) {
                 console.error('Error saving team:', e);
             }
@@ -1406,10 +1687,11 @@
             }
         }
 
-        // Save history to localStorage
+        // Save history to localStorage and Firebase
         function saveHistoryToStorage() {
             try {
                 localStorage.setItem(HISTORY_KEY, JSON.stringify(splitHistory));
+                saveHistoryToFirebase(); // Sync to Firebase
             } catch (e) {
                 console.error('Error saving history:', e);
             }
