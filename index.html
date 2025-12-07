@@ -394,7 +394,58 @@
             padding-top: 12px;
             margin-top: 8px;
         }
-        
+
+        .summary-row.expected-total {
+            font-size: 13px;
+            color: #666;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #ddd;
+            align-items: center;
+        }
+
+        .expected-input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .expected-input {
+            width: 80px;
+            padding: 6px 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: right;
+            outline: none;
+        }
+
+        .expected-input:focus {
+            border-color: #7B2D8E;
+        }
+
+        .total-match {
+            text-align: center;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .total-match.match {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .total-match.mismatch {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+        }
+
         .negative {
             color: #28a745;
         }
@@ -1204,6 +1255,14 @@
                     <span>Total</span>
                     <span id="totalDisplay">S$ 0.00</span>
                 </div>
+                <div class="summary-row expected-total">
+                    <span>Expected Total (from receipt)</span>
+                    <div class="expected-input-wrap">
+                        <span>S$</span>
+                        <input type="number" class="expected-input" id="expectedTotal" placeholder="0.00" step="0.01" oninput="checkTotalMatch()">
+                    </div>
+                </div>
+                <div class="total-match" id="totalMatch"></div>
             </div>
             
             <div class="card-title"><span class="icon">💰</span> Each Person Pays</div>
@@ -1574,8 +1633,41 @@
             const hasData = people.length > 0 && subtotal > 0;
             document.getElementById('shareActions').style.display = hasData ? 'flex' : 'none';
 
+            // Check if total matches expected
+            checkTotalMatch(total);
+
             // Calculate per-person breakdown
             calculatePersonBreakdown(subtotal, serviceAmt, discountAmt, gstAmt, total);
+        }
+
+        // Check if calculated total matches expected total
+        function checkTotalMatch(calculatedTotal) {
+            const expectedInput = document.getElementById('expectedTotal');
+            const matchDiv = document.getElementById('totalMatch');
+            const expected = parseFloat(expectedInput.value) || 0;
+
+            if (expected <= 0) {
+                matchDiv.className = 'total-match';
+                matchDiv.textContent = '';
+                return;
+            }
+
+            if (calculatedTotal === undefined) {
+                // Get current total from display
+                const totalText = document.getElementById('totalDisplay').textContent;
+                calculatedTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+            }
+
+            const diff = Math.abs(calculatedTotal - expected);
+
+            if (diff < 0.05) {
+                matchDiv.className = 'total-match match';
+                matchDiv.textContent = '✓ Total matches expected amount!';
+            } else {
+                matchDiv.className = 'total-match mismatch';
+                const diffSign = calculatedTotal > expected ? '+' : '-';
+                matchDiv.textContent = `⚠ Difference: ${diffSign}S$${diff.toFixed(2)} (Expected: S$${expected.toFixed(2)})`;
+            }
         }
 
         // Rounding helper
@@ -2035,6 +2127,10 @@
                 if (outputs.discount && outputs.discount > 0) {
                     document.getElementById('discountValue').value = outputs.discount.toFixed(2);
                     document.getElementById('discountType').value = 'amount';
+                }
+                // Auto-fill expected total (grand_total from receipt)
+                if (outputs.grand_total && outputs.grand_total > 0) {
+                    document.getElementById('expectedTotal').value = outputs.grand_total.toFixed(2);
                 }
 
                 if (extracted.length > 0) {
