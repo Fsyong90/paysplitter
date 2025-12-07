@@ -1212,6 +1212,54 @@
             background: #f8d7da;
             color: #721c24;
         }
+
+        /* Quick Split Buttons */
+        .quick-split-section {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .quick-split-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .quick-split-btn:hover {
+            border-color: #7B2D8E;
+            background: #f8f4fa;
+        }
+
+        .quick-split-btn:active {
+            transform: scale(0.98);
+        }
+
+        .quick-split-btn .icon {
+            font-size: 20px;
+        }
+
+        .quick-split-btn .label {
+            color: #333;
+        }
+
+        .quick-split-btn .desc {
+            font-size: 10px;
+            color: #888;
+            font-weight: 400;
+        }
     </style>
 </head>
 <body>
@@ -1271,6 +1319,25 @@
         <!-- Items -->
         <div class="card">
             <div class="card-title"><span class="icon">🍽️</span> What's Ordered?</div>
+
+            <!-- Quick Split Buttons -->
+            <div class="quick-split-section" id="quickSplitSection">
+                <button class="quick-split-btn" onclick="splitAllEqually()">
+                    <span class="icon">👥</span>
+                    <span class="label">Split Equally</span>
+                    <span class="desc">Everyone shares all</span>
+                </button>
+                <button class="quick-split-btn" onclick="splitEachOwn()">
+                    <span class="icon">🙋</span>
+                    <span class="label">Each Own</span>
+                    <span class="desc">Assign per person</span>
+                </button>
+                <button class="quick-split-btn" onclick="clearAllAssignments()">
+                    <span class="icon">🔄</span>
+                    <span class="label">Clear All</span>
+                    <span class="desc">Reset assignments</span>
+                </button>
+            </div>
 
             <!-- AI Receipt Scanner -->
             <div class="ocr-section">
@@ -1728,6 +1795,56 @@
             saveTeam();
             renderSavedTeam();
             showToast(`Removed ${name} from team`);
+        }
+
+        // ==================== QUICK SPLIT FUNCTIONS ====================
+
+        // Split all items equally among everyone
+        function splitAllEqually() {
+            if (people.length === 0) {
+                showToast('Add people first!');
+                return;
+            }
+            if (items.length === 0) {
+                showToast('Add items first!');
+                return;
+            }
+
+            items.forEach(item => {
+                item.people = [...people]; // Assign everyone to every item
+            });
+
+            renderItems();
+            calculate();
+            showToast('All items split equally!');
+        }
+
+        // Each person gets their own items (for manual assignment)
+        function splitEachOwn() {
+            if (people.length === 0) {
+                showToast('Add people first!');
+                return;
+            }
+
+            // Clear all assignments so user can manually assign
+            items.forEach(item => {
+                item.people = [];
+            });
+
+            renderItems();
+            calculate();
+            showToast('Cleared! Now assign each item to its owner');
+        }
+
+        // Clear all item assignments
+        function clearAllAssignments() {
+            items.forEach(item => {
+                item.people = [];
+            });
+
+            renderItems();
+            calculate();
+            showToast('All assignments cleared');
         }
 
         // Select all team members
