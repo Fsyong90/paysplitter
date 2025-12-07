@@ -2017,9 +2017,25 @@
                 const result = await response.json();
                 console.log('API Response:', result);
 
-                // Parse the split_result from the API response
-                const splitResult = result.data?.outputs?.split_result || result.split_result || '';
+                // Parse the response from the API
+                const outputs = result.data?.outputs || {};
+                const splitResult = outputs.split_result || '';
                 const extracted = parseInseaResult(splitResult);
+
+                // Auto-fill bill options if provided
+                if (outputs.service_charge && outputs.service_charge > 0) {
+                    document.getElementById('hasService').checked = true;
+                    // Calculate service charge percentage from subtotal after discount
+                    const subtotalAfterDiscount = (outputs.subtotal || 0) - (outputs.discount || 0);
+                    if (subtotalAfterDiscount > 0) {
+                        const svcPct = (outputs.service_charge / subtotalAfterDiscount * 100).toFixed(1);
+                        document.getElementById('serviceRate').value = svcPct;
+                    }
+                }
+                if (outputs.discount && outputs.discount > 0) {
+                    document.getElementById('discountValue').value = outputs.discount.toFixed(2);
+                    document.getElementById('discountType').value = 'amount';
+                }
 
                 if (extracted.length > 0) {
                     // Show preview instead of adding directly
@@ -2028,7 +2044,8 @@
                     setTimeout(() => { status.className = 'ocr-status'; }, 3000);
                 } else {
                     status.className = 'ocr-status show error';
-                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${splitResult.replace(/`/g, "'").replace(/\\/g, "\\\\").replace(/\n/g, "\\n")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
+                    const rawText = typeof splitResult === 'string' ? splitResult : JSON.stringify(splitResult);
+                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${rawText.replace(/`/g, "'").replace(/\\/g, "\\\\").replace(/\n/g, "\\n")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
                 }
             } catch (e) {
                 console.error('API error:', e);
@@ -2040,23 +2057,46 @@
         }
 
         // Parse the ai.insea.io result format
-        function parseInseaResult(text) {
-            console.log('Parsing result:', text);
+        function parseInseaResult(data) {
+            console.log('Parsing result:', data);
             const items = [];
 
-            // Match lines like: "1. Thai Style Fried Tang Hoon - $9.00"
-            // Or: "- **Subtotal**: $82.20" (skip these summary lines)
+            // Handle JSON array format (new workflow)
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                } catch (e) {
+                    // Not JSON, try legacy text parsing
+                    return parseLegacyTextFormat(data);
+                }
+            }
+
+            // If it's an array of items
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    if (item.name && item.price !== undefined) {
+                        items.push({
+                            name: item.name,
+                            price: parseFloat(item.price)
+                        });
+                    }
+                });
+            }
+
+            console.log('Extracted items:', items);
+            return items;
+        }
+
+        // Legacy text format parser (fallback)
+        function parseLegacyTextFormat(text) {
+            const items = [];
             const itemPattern = /^\d+\.\s*(.+?)\s*-\s*\$?([\d.]+)\s*$/gm;
 
             let match;
             while ((match = itemPattern.exec(text)) !== null) {
-                let name = match[1].trim();
+                let name = match[1].trim().replace(/\*\*/g, '');
                 const price = parseFloat(match[2]);
 
-                // Clean up name - remove ** markers
-                name = name.replace(/\*\*/g, '').trim();
-
-                // Skip if it looks like a summary line
                 const skipWords = ['subtotal', 'total', 'discount', 'gst', 'tax', 'service', 'rounding', 'grand'];
                 if (skipWords.some(word => name.toLowerCase().includes(word))) continue;
 
@@ -2064,8 +2104,6 @@
                     items.push({ name, price });
                 }
             }
-
-            console.log('Extracted items:', items);
             return items;
         }
 
