@@ -548,6 +548,293 @@
             margin-top: 4px;
             font-style: italic;
         }
+
+        /* Saved Team Section */
+        .team-section {
+            margin-bottom: 12px;
+        }
+
+        .team-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .team-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .team-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .team-btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .team-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .team-btn.active {
+            background: #7B2D8E;
+            color: white;
+            border-color: #7B2D8E;
+        }
+
+        .saved-team-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .saved-person {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            background: #f0f0f0;
+            border-radius: 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .saved-person.selected {
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            color: white;
+        }
+
+        .saved-person .delete-saved {
+            margin-left: 4px;
+            opacity: 0.6;
+            font-size: 14px;
+        }
+
+        .saved-person .delete-saved:hover {
+            opacity: 1;
+        }
+
+        /* History Section */
+        .history-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .history-item:hover {
+            background: #e9ecef;
+        }
+
+        .history-info {
+            flex: 1;
+        }
+
+        .history-date {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .history-desc {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .history-people {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .history-total {
+            font-weight: 700;
+            color: #7B2D8E;
+            font-size: 16px;
+        }
+
+        .history-delete {
+            margin-left: 12px;
+            padding: 6px 10px;
+            background: #fee;
+            color: #e74c3c;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .history-delete:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        /* Share Buttons */
+        .share-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+
+        .share-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .share-btn.whatsapp {
+            background: #25D366;
+            color: white;
+        }
+
+        .share-btn.copy-link {
+            background: #6c757d;
+            color: white;
+        }
+
+        .share-btn.save-history {
+            background: #007bff;
+            color: white;
+        }
+
+        /* Rounding Option */
+        .rounding-select {
+            padding: 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        /* Tab navigation */
+        .tab-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #7B2D8E;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* OCR Section */
+        .ocr-section {
+            margin-bottom: 12px;
+        }
+
+        .ocr-upload {
+            width: 100%;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            background: #fafafa;
+            transition: all 0.2s;
+        }
+
+        .ocr-upload:hover {
+            border-color: #7B2D8E;
+            background: #f5f0f7;
+        }
+
+        .ocr-upload input {
+            display: none;
+        }
+
+        .ocr-status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #1565c0;
+            display: none;
+        }
+
+        .ocr-status.show {
+            display: block;
+        }
+
+        .ocr-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
     </style>
 </head>
 <body>
@@ -556,13 +843,35 @@
             <h1>🍜 PayNow Splitter</h1>
             <p>Each person pays for their own items</p>
         </div>
-        
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('split')">🧾 Split Bill</button>
+            <button class="tab-btn" onclick="switchTab('history')">📋 History</button>
+        </div>
+
+        <!-- Split Bill Tab -->
+        <div class="tab-content active" id="tab-split">
+
         <!-- People -->
         <div class="card">
             <div class="card-title"><span class="icon">👥</span> Who's Eating?</div>
+
+            <!-- Saved Team -->
+            <div class="team-section" id="teamSection">
+                <div class="team-header">
+                    <span class="team-label">Your Team (click to add)</span>
+                    <div class="team-actions">
+                        <button class="team-btn" onclick="selectAllTeam()">All</button>
+                        <button class="team-btn" onclick="selectNoneTeam()">None</button>
+                    </div>
+                </div>
+                <div class="saved-team-list" id="savedTeamList"></div>
+            </div>
+
             <div class="people-list" id="peopleList"></div>
             <div class="add-person-row">
-                <input type="text" class="add-person-input" id="newPersonName" placeholder="Enter name" onkeypress="if(event.key==='Enter')addPerson()">
+                <input type="text" class="add-person-input" id="newPersonName" placeholder="Enter name (saves to team)" onkeypress="if(event.key==='Enter')addPerson()">
                 <button class="add-btn" onclick="addPerson()">+ Add</button>
             </div>
         </div>
@@ -570,6 +879,16 @@
         <!-- Items -->
         <div class="card">
             <div class="card-title"><span class="icon">🍽️</span> What's Ordered?</div>
+
+            <!-- OCR Upload -->
+            <div class="ocr-section">
+                <label class="ocr-upload" id="ocrUpload">
+                    <input type="file" accept="image/*" onchange="handleReceiptUpload(event)">
+                    📷 Scan Receipt (tap to upload photo)
+                </label>
+                <div class="ocr-status" id="ocrStatus"></div>
+            </div>
+
             <div id="itemsList"></div>
             <button class="add-item-btn" onclick="addItem()">+ Add Item</button>
         </div>
@@ -621,6 +940,21 @@
                         </label>
                     </div>
                 </div>
+
+                <div class="option-row">
+                    <div class="option-label">
+                        <span>Rounding</span>
+                        <span>Per person amount</span>
+                    </div>
+                    <div class="option-controls">
+                        <select class="rounding-select" id="roundingType" onchange="calculate()">
+                            <option value="none">Exact</option>
+                            <option value="0.10">$0.10</option>
+                            <option value="0.50">$0.50</option>
+                            <option value="1.00">$1.00</option>
+                        </select>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -654,7 +988,28 @@
             <div id="breakdownList">
                 <div class="no-items">Add people and items to see breakdown</div>
             </div>
+
+            <!-- Share Actions -->
+            <div class="share-actions" id="shareActions" style="display: none;">
+                <button class="share-btn whatsapp" onclick="shareWhatsApp()">📱 WhatsApp</button>
+                <button class="share-btn copy-link" onclick="copyShareLink()">🔗 Copy Link</button>
+                <button class="share-btn save-history" onclick="saveToHistory()">💾 Save</button>
+            </div>
         </div>
+
+        </div><!-- End Split Tab -->
+
+        <!-- History Tab -->
+        <div class="tab-content" id="tab-history">
+            <div class="card">
+                <div class="card-title"><span class="icon">📋</span> Split History</div>
+                <div id="historyList">
+                    <div class="no-items">No saved splits yet</div>
+                </div>
+                <button class="add-item-btn" onclick="clearHistory()" style="margin-top: 12px; border-color: #e74c3c; color: #e74c3c;">🗑️ Clear All History</button>
+            </div>
+        </div>
+
     </div>
     
     <!-- QR Modal -->
@@ -674,29 +1029,170 @@
         </div>
     </div>
 
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
     <script>
         let people = [];
         let items = [];
         let itemIdCounter = 0;
         let qrcode = null;
-        
-        // Initialize with some defaults
+        let savedTeam = [];
+        let splitHistory = [];
+        let tesseractLoaded = false;
+
+        // LocalStorage keys
+        const TEAM_KEY = 'paynow_team';
+        const HISTORY_KEY = 'paynow_history';
+
+        // Initialize
         function init() {
-            addPerson('Me');
-            addItem();
+            loadSavedTeam();
+            loadHistory();
+            checkUrlParams();
+            if (people.length === 0) {
+                addItem();
+            }
+            renderSavedTeam();
+            renderHistory();
+        }
+
+        // Load saved team from localStorage
+        function loadSavedTeam() {
+            try {
+                const saved = localStorage.getItem(TEAM_KEY);
+                if (saved) {
+                    savedTeam = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error('Error loading team:', e);
+            }
+        }
+
+        // Save team to localStorage
+        function saveTeam() {
+            try {
+                localStorage.setItem(TEAM_KEY, JSON.stringify(savedTeam));
+            } catch (e) {
+                console.error('Error saving team:', e);
+            }
+        }
+
+        // Load history from localStorage
+        function loadHistory() {
+            try {
+                const saved = localStorage.getItem(HISTORY_KEY);
+                if (saved) {
+                    splitHistory = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error('Error loading history:', e);
+            }
+        }
+
+        // Save history to localStorage
+        function saveHistoryToStorage() {
+            try {
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(splitHistory));
+            } catch (e) {
+                console.error('Error saving history:', e);
+            }
+        }
+
+        // Render saved team
+        function renderSavedTeam() {
+            const list = document.getElementById('savedTeamList');
+            if (savedTeam.length === 0) {
+                list.innerHTML = '<span style="font-size: 12px; color: #888;">Add people to build your team</span>';
+                return;
+            }
+            list.innerHTML = savedTeam.map(name => `
+                <div class="saved-person ${people.includes(name) ? 'selected' : ''}" onclick="toggleSavedPerson('${name}')">
+                    ${name}
+                    <span class="delete-saved" onclick="event.stopPropagation(); deleteSavedPerson('${name}')">×</span>
+                </div>
+            `).join('');
+        }
+
+        // Toggle saved person in/out of current session
+        function toggleSavedPerson(name) {
+            if (people.includes(name)) {
+                removePerson(name);
+            } else {
+                addPerson(name);
+            }
+            renderSavedTeam();
+        }
+
+        // Delete from saved team
+        function deleteSavedPerson(name) {
+            savedTeam = savedTeam.filter(n => n !== name);
+            saveTeam();
+            renderSavedTeam();
+            showToast(`Removed ${name} from team`);
+        }
+
+        // Select all team members
+        function selectAllTeam() {
+            savedTeam.forEach(name => {
+                if (!people.includes(name)) {
+                    people.push(name);
+                    items.forEach(item => {
+                        if (!item.people.includes(name)) {
+                            item.people.push(name);
+                        }
+                    });
+                }
+            });
+            renderPeople();
+            renderItems();
+            renderSavedTeam();
+            calculate();
+        }
+
+        // Deselect all team members
+        function selectNoneTeam() {
+            people = [];
+            items.forEach(item => item.people = []);
+            renderPeople();
+            renderItems();
+            renderSavedTeam();
+            calculate();
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        // Show toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
         }
         
         function addPerson(name) {
             const inputName = name || document.getElementById('newPersonName').value.trim();
             if (!inputName) return;
-            
+
             if (!people.includes(inputName)) {
                 people.push(inputName);
+                // Also save to team if new
+                if (!savedTeam.includes(inputName)) {
+                    savedTeam.push(inputName);
+                    saveTeam();
+                }
                 renderPeople();
                 renderItems();
+                renderSavedTeam();
                 calculate();
             }
-            
+
             document.getElementById('newPersonName').value = '';
         }
         
@@ -797,12 +1293,12 @@
             items.forEach(item => {
                 subtotal += item.price || 0;
             });
-            
+
             // Service charge
             const hasService = document.getElementById('hasService').checked;
             const serviceRate = parseFloat(document.getElementById('serviceRate').value) || 10;
             const serviceAmt = hasService ? subtotal * (serviceRate / 100) : 0;
-            
+
             // Discount
             const discountValue = parseFloat(document.getElementById('discountValue').value) || 0;
             const discountType = document.getElementById('discountType').value;
@@ -812,18 +1308,18 @@
             } else {
                 discountAmt = discountValue;
             }
-            
+
             // Taxable
             const taxable = subtotal + serviceAmt - discountAmt;
-            
+
             // GST
             const hasGST = document.getElementById('hasGST').checked;
             const gstRate = parseFloat(document.getElementById('gstRate').value) || 9;
             const gstAmt = hasGST ? taxable * (gstRate / 100) : 0;
-            
+
             // Total
             const total = taxable + gstAmt;
-            
+
             // Update summary display
             document.getElementById('subtotalDisplay').textContent = `S$ ${subtotal.toFixed(2)}`;
             document.getElementById('svcPct').textContent = serviceRate;
@@ -835,9 +1331,21 @@
             document.getElementById('gstRow').style.display = hasGST ? 'flex' : 'none';
             document.getElementById('gstDisplay').textContent = `S$ ${gstAmt.toFixed(2)}`;
             document.getElementById('totalDisplay').textContent = `S$ ${total.toFixed(2)}`;
-            
+
+            // Show/hide share actions
+            const hasData = people.length > 0 && subtotal > 0;
+            document.getElementById('shareActions').style.display = hasData ? 'flex' : 'none';
+
             // Calculate per-person breakdown
             calculatePersonBreakdown(subtotal, serviceAmt, discountAmt, gstAmt, total);
+        }
+
+        // Rounding helper
+        function roundAmount(amount) {
+            const roundType = document.getElementById('roundingType').value;
+            if (roundType === 'none') return amount;
+            const step = parseFloat(roundType);
+            return Math.ceil(amount / step) * step;
         }
         
         function calculatePersonBreakdown(subtotal, serviceAmt, discountAmt, gstAmt, total) {
@@ -876,8 +1384,9 @@
                 const personService = serviceAmt * proportion;
                 const personDiscount = discountAmt * proportion;
                 const personGst = gstAmt * proportion;
-                const personTotal = personSubtotal + personService - personDiscount + personGst;
-                
+                const exactTotal = personSubtotal + personService - personDiscount + personGst;
+                const personTotal = roundAmount(exactTotal);
+
                 return {
                     name: person,
                     items: itemDetails,
@@ -885,6 +1394,7 @@
                     service: personService,
                     discount: personDiscount,
                     gst: personGst,
+                    exactTotal: exactTotal,
                     total: personTotal
                 };
             });
@@ -1005,7 +1515,310 @@
                 link.click();
             }
         }
-        
+
+        // ==================== SHARING ====================
+
+        // Generate share text
+        function generateShareText() {
+            const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            let text = `🍜 Lunch Split - ${today}\n\n`;
+
+            const personData = getPersonData();
+            personData.forEach(p => {
+                if (p.total > 0) {
+                    text += `${p.name}: S$${p.total.toFixed(2)}\n`;
+                }
+            });
+
+            const total = personData.reduce((sum, p) => sum + p.total, 0);
+            text += `\n💰 Total: S$${total.toFixed(2)}`;
+            text += `\n\nPayNow to +65 8339 9525`;
+
+            return text;
+        }
+
+        // Get person data for sharing
+        function getPersonData() {
+            let subtotal = 0;
+            items.forEach(item => subtotal += item.price || 0);
+
+            const hasService = document.getElementById('hasService').checked;
+            const serviceRate = parseFloat(document.getElementById('serviceRate').value) || 10;
+            const serviceAmt = hasService ? subtotal * (serviceRate / 100) : 0;
+
+            const discountValue = parseFloat(document.getElementById('discountValue').value) || 0;
+            const discountType = document.getElementById('discountType').value;
+            let discountAmt = discountType === 'percent' ? subtotal * (discountValue / 100) : discountValue;
+
+            const taxable = subtotal + serviceAmt - discountAmt;
+            const hasGST = document.getElementById('hasGST').checked;
+            const gstRate = parseFloat(document.getElementById('gstRate').value) || 9;
+            const gstAmt = hasGST ? taxable * (gstRate / 100) : 0;
+
+            return people.map(person => {
+                const personItems = items.filter(item => item.people.includes(person));
+                let personSubtotal = 0;
+                personItems.forEach(item => {
+                    const shareCount = item.people.length || 1;
+                    personSubtotal += (item.price || 0) / shareCount;
+                });
+
+                const proportion = subtotal > 0 ? personSubtotal / subtotal : 0;
+                const exactTotal = personSubtotal + (serviceAmt * proportion) - (discountAmt * proportion) + (gstAmt * proportion);
+                return { name: person, total: roundAmount(exactTotal) };
+            });
+        }
+
+        // Share via WhatsApp
+        function shareWhatsApp() {
+            const text = encodeURIComponent(generateShareText());
+            window.open(`https://wa.me/?text=${text}`, '_blank');
+        }
+
+        // Copy share link
+        function copyShareLink() {
+            const data = {
+                p: people,
+                i: items.map(it => ({ n: it.name, pr: it.price, ppl: it.people })),
+                svc: document.getElementById('hasService').checked ? parseFloat(document.getElementById('serviceRate').value) : 0,
+                gst: document.getElementById('hasGST').checked ? parseFloat(document.getElementById('gstRate').value) : 0,
+                disc: parseFloat(document.getElementById('discountValue').value) || 0,
+                discType: document.getElementById('discountType').value
+            };
+            const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
+            const url = `${window.location.origin}${window.location.pathname}?d=${encoded}`;
+
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('Link copied to clipboard!');
+            }).catch(() => {
+                showToast('Failed to copy link');
+            });
+        }
+
+        // Check URL params for shared data
+        function checkUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const data = params.get('d');
+            if (data) {
+                try {
+                    const decoded = JSON.parse(decodeURIComponent(atob(data)));
+                    people = decoded.p || [];
+                    items = (decoded.i || []).map((it, idx) => ({
+                        id: idx,
+                        name: it.n,
+                        price: it.pr,
+                        people: it.ppl
+                    }));
+                    itemIdCounter = items.length;
+
+                    if (decoded.svc > 0) {
+                        document.getElementById('hasService').checked = true;
+                        document.getElementById('serviceRate').value = decoded.svc;
+                    }
+                    if (decoded.gst > 0) {
+                        document.getElementById('hasGST').checked = true;
+                        document.getElementById('gstRate').value = decoded.gst;
+                    }
+                    if (decoded.disc > 0) {
+                        document.getElementById('discountValue').value = decoded.disc;
+                        document.getElementById('discountType').value = decoded.discType || 'amount';
+                    }
+
+                    renderPeople();
+                    renderItems();
+                    calculate();
+                    showToast('Loaded shared bill');
+
+                    // Clear URL params
+                    window.history.replaceState({}, '', window.location.pathname);
+                } catch (e) {
+                    console.error('Error loading shared data:', e);
+                }
+            }
+        }
+
+        // ==================== HISTORY ====================
+
+        // Save current split to history
+        function saveToHistory() {
+            const today = new Date();
+            const personData = getPersonData();
+            const total = personData.reduce((sum, p) => sum + p.total, 0);
+
+            const entry = {
+                id: Date.now(),
+                date: today.toISOString(),
+                people: [...people],
+                items: items.map(it => ({ name: it.name, price: it.price, people: it.people })),
+                total: total,
+                breakdown: personData
+            };
+
+            splitHistory.unshift(entry);
+            if (splitHistory.length > 50) splitHistory.pop(); // Keep last 50
+            saveHistoryToStorage();
+            renderHistory();
+            showToast('Saved to history');
+        }
+
+        // Render history list
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            if (splitHistory.length === 0) {
+                list.innerHTML = '<div class="no-items">No saved splits yet</div>';
+                return;
+            }
+
+            list.innerHTML = splitHistory.map(entry => {
+                const date = new Date(entry.date);
+                const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                return `
+                    <div class="history-item" onclick="loadHistory(${entry.id})">
+                        <div class="history-info">
+                            <div class="history-date">${dateStr} ${timeStr}</div>
+                            <div class="history-people">${entry.people.join(', ')}</div>
+                        </div>
+                        <div class="history-total">S$ ${entry.total.toFixed(2)}</div>
+                        <button class="history-delete" onclick="event.stopPropagation(); deleteHistory(${entry.id})">×</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Load a history entry
+        function loadHistory(id) {
+            const entry = splitHistory.find(e => e.id === id);
+            if (!entry) return;
+
+            people = [...entry.people];
+            items = entry.items.map((it, idx) => ({
+                id: idx,
+                name: it.name,
+                price: it.price,
+                people: it.people
+            }));
+            itemIdCounter = items.length;
+
+            renderPeople();
+            renderItems();
+            renderSavedTeam();
+            calculate();
+            switchTab('split');
+            showToast('Loaded from history');
+        }
+
+        // Delete history entry
+        function deleteHistory(id) {
+            splitHistory = splitHistory.filter(e => e.id !== id);
+            saveHistoryToStorage();
+            renderHistory();
+            showToast('Deleted from history');
+        }
+
+        // Clear all history
+        function clearHistory() {
+            if (confirm('Clear all history?')) {
+                splitHistory = [];
+                saveHistoryToStorage();
+                renderHistory();
+                showToast('History cleared');
+            }
+        }
+
+        // ==================== OCR (Receipt Scanning) ====================
+
+        // Handle receipt upload
+        async function handleReceiptUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const status = document.getElementById('ocrStatus');
+            status.className = 'ocr-status show';
+            status.textContent = 'Loading OCR engine...';
+
+            try {
+                // Load Tesseract.js on demand
+                if (!tesseractLoaded) {
+                    await loadTesseract();
+                    tesseractLoaded = true;
+                }
+
+                status.textContent = 'Scanning receipt...';
+
+                const result = await Tesseract.recognize(file, 'eng', {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            status.textContent = `Scanning... ${Math.round(m.progress * 100)}%`;
+                        }
+                    }
+                });
+
+                const text = result.data.text;
+                const extracted = extractItemsFromText(text);
+
+                if (extracted.length > 0) {
+                    extracted.forEach(item => {
+                        items.push({
+                            id: itemIdCounter++,
+                            name: item.name,
+                            price: item.price,
+                            people: [...people]
+                        });
+                    });
+                    renderItems();
+                    calculate();
+                    status.textContent = `Found ${extracted.length} items!`;
+                    setTimeout(() => { status.className = 'ocr-status'; }, 3000);
+                } else {
+                    status.className = 'ocr-status show error';
+                    status.textContent = 'No items found. Try a clearer photo.';
+                }
+            } catch (e) {
+                console.error('OCR error:', e);
+                status.className = 'ocr-status show error';
+                status.textContent = 'Error scanning receipt. Please try again.';
+            }
+
+            event.target.value = '';
+        }
+
+        // Load Tesseract.js dynamically
+        function loadTesseract() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Extract items and prices from OCR text
+        function extractItemsFromText(text) {
+            const lines = text.split('\n').filter(l => l.trim());
+            const items = [];
+
+            // Pattern: item name followed by price (e.g., "Chicken Rice 5.50" or "5.50 Chicken Rice")
+            const pricePattern = /(\d+[.,]\d{2})/;
+
+            lines.forEach(line => {
+                const match = line.match(pricePattern);
+                if (match) {
+                    const price = parseFloat(match[1].replace(',', '.'));
+                    if (price > 0 && price < 500) { // Reasonable price range
+                        let name = line.replace(match[0], '').trim();
+                        name = name.replace(/^[\s\-\*\.x\d]+/, '').replace(/[\s\-\*\.]+$/, '').trim();
+                        if (name.length > 1 && name.length < 50) {
+                            items.push({ name, price });
+                        }
+                    }
+                }
+            });
+
+            return items;
+        }
+
         // Initialize
         init();
     </script>
