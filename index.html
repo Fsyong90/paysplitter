@@ -32,16 +32,35 @@
             text-align: center;
             color: white;
             margin-bottom: 20px;
+            position: relative;
         }
-        
+
         .header h1 {
             font-size: 28px;
             margin-bottom: 5px;
         }
-        
+
         .header p {
             opacity: 0.9;
             font-size: 14px;
+        }
+
+        .settings-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .settings-btn:hover {
+            background: rgba(255,255,255,0.3);
         }
         
         .card {
@@ -632,7 +651,61 @@
             color: #888;
             margin-top: 16px;
         }
-        
+
+        /* Settings Modal Styles */
+        .settings-form {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .settings-group {
+            margin-bottom: 16px;
+        }
+
+        .settings-label {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .settings-help {
+            font-size: 12px;
+            color: #888;
+            margin: 0 0 8px 0;
+        }
+
+        .settings-input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-prefix {
+            font-weight: 600;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .settings-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .settings-input:focus {
+            outline: none;
+            border-color: #7B2D8E;
+        }
+
+        .settings-input.error {
+            border-color: #dc3545;
+        }
+
         .no-items {
             text-align: center;
             padding: 20px;
@@ -1379,6 +1452,47 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* Buy Me a Coffee Section */
+        .coffee-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .coffee-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .coffee-image {
+            height: 50px;
+            margin-bottom: 12px;
+        }
+
+        .coffee-text {
+            color: #666;
+            font-size: 14px;
+            margin: 0 0 16px 0;
+        }
+
+        .coffee-qr {
+            display: flex;
+            justify-content: center;
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .coffee-subtext {
+            color: #888;
+            font-size: 12px;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -1386,6 +1500,7 @@
         <div class="header">
             <h1>🍜 PayNow Splitter</h1>
             <p>Each person pays for their own items</p>
+            <button class="settings-btn" onclick="openSettings()" title="Settings">⚙️</button>
         </div>
 
         <!-- Tab Navigation -->
@@ -1615,6 +1730,16 @@
             </div>
         </div>
 
+        <!-- Buy Me a Coffee -->
+        <div class="coffee-section">
+            <div class="coffee-card">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" class="coffee-image">
+                <p class="coffee-text">If you find this app useful, buy me a coffee!</p>
+                <div class="coffee-qr" id="coffeeQrCode"></div>
+                <p class="coffee-subtext">Scan to PayNow S$3.00</p>
+            </div>
+        </div>
+
     </div>
     
     <!-- QR Modal -->
@@ -1636,6 +1761,27 @@
 
     <!-- Toast -->
     <div class="toast" id="toast"></div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-title">⚙️ Settings</div>
+            <div class="settings-form">
+                <div class="settings-group">
+                    <label class="settings-label">PayNow Phone Number</label>
+                    <p class="settings-help">Enter your Singapore phone number (8 digits)</p>
+                    <div class="settings-input-row">
+                        <span class="settings-prefix">+65</span>
+                        <input type="tel" class="settings-input" id="paynowNumberInput" placeholder="8XXXXXXX" maxlength="8" pattern="[89][0-9]{7}">
+                    </div>
+                </div>
+            </div>
+            <div class="qr-actions">
+                <button class="qr-btn download" onclick="saveSettings()">💾 Save</button>
+                <button class="qr-btn close" onclick="closeSettings()">✕ Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Receipt Full View Modal -->
     <div class="receipt-modal" id="receiptModal" onclick="closeReceiptModal()">
@@ -1672,6 +1818,10 @@
         const TEAM_KEY = 'paynow_team';
         const HISTORY_KEY = 'paynow_history';
         const TEAM_CODE_KEY = 'paynow_team_code';
+        const PAYNOW_NUMBER_KEY = 'paynow_number';
+
+        // Default PayNow number
+        const DEFAULT_PAYNOW_NUMBER = '+6583399525';
 
         // Firebase configuration
         const firebaseConfig = {
@@ -1708,6 +1858,48 @@
             renderSavedTeam();
             renderHistory();
             renderTeamCodeUI();
+            updatePayNowDisplay();
+            generateCoffeeQR();
+        }
+
+        // Generate Buy Me a Coffee QR code
+        function generateCoffeeQR() {
+            const coffeeAmount = 3.00; // S$3.00 for a coffee
+            const coffeePayNowString = generateCoffeePayNowString(coffeeAmount);
+
+            new QRCode(document.getElementById('coffeeQrCode'), {
+                text: coffeePayNowString,
+                width: 120,
+                height: 120,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+
+        // Generate PayNow string for coffee (always uses developer's number)
+        function generateCoffeePayNowString(amount) {
+            let merchantAcctInfo = '';
+            merchantAcctInfo += tlv('00', 'SG.PAYNOW');
+            merchantAcctInfo += tlv('01', '0');
+            merchantAcctInfo += tlv('02', '+6583399525'); // Developer's PayNow number
+            merchantAcctInfo += tlv('03', '1');
+
+            let payload = '';
+            payload += tlv('00', '01');
+            payload += tlv('01', '12');
+            payload += tlv('26', merchantAcctInfo);
+            payload += tlv('52', '0000');
+            payload += tlv('53', '702');
+            payload += tlv('54', amount.toFixed(2));
+            payload += tlv('58', 'SG');
+            payload += tlv('59', 'NA');
+            payload += tlv('60', 'Singapore');
+            payload += tlv('62', tlv('05', 'Coffee'));
+
+            payload += '6304';
+            const checksum = calculateCRC(payload);
+            return payload + checksum;
         }
 
         // Load team code from localStorage and connect
@@ -2386,7 +2578,7 @@
             let merchantAcctInfo = '';
             merchantAcctInfo += tlv('00', 'SG.PAYNOW');
             merchantAcctInfo += tlv('01', '0');
-            merchantAcctInfo += tlv('02', '+6583399525');
+            merchantAcctInfo += tlv('02', getPayNowNumber());
             merchantAcctInfo += tlv('03', '1');
             
             let payload = '';
@@ -2441,7 +2633,64 @@
                 document.getElementById('qrModal').classList.remove('show');
             }
         }
-        
+
+        // ==================== SETTINGS ====================
+
+        function getPayNowNumber() {
+            return localStorage.getItem(PAYNOW_NUMBER_KEY) || DEFAULT_PAYNOW_NUMBER;
+        }
+
+        function getPayNowDisplay() {
+            const num = getPayNowNumber();
+            // Format: +65 8339 9525
+            return num.replace(/(\+65)(\d{4})(\d{4})/, '$1 $2 $3');
+        }
+
+        function openSettings() {
+            const modal = document.getElementById('settingsModal');
+            const input = document.getElementById('paynowNumberInput');
+            // Load current number (without +65 prefix)
+            const currentNumber = getPayNowNumber().replace('+65', '');
+            input.value = currentNumber;
+            input.classList.remove('error');
+            modal.classList.add('show');
+        }
+
+        function closeSettings(event) {
+            if (!event || event.target === document.getElementById('settingsModal')) {
+                document.getElementById('settingsModal').classList.remove('show');
+            }
+        }
+
+        function saveSettings() {
+            const input = document.getElementById('paynowNumberInput');
+            const number = input.value.trim();
+
+            // Validate: 8 digits starting with 8 or 9
+            if (!/^[89]\d{7}$/.test(number)) {
+                input.classList.add('error');
+                showToast('Please enter a valid Singapore phone number (8 digits starting with 8 or 9)');
+                return;
+            }
+
+            // Save with +65 prefix
+            const fullNumber = '+65' + number;
+            localStorage.setItem(PAYNOW_NUMBER_KEY, fullNumber);
+
+            // Update displayed phone info
+            updatePayNowDisplay();
+
+            closeSettings();
+            showToast('PayNow number saved!');
+        }
+
+        function updatePayNowDisplay() {
+            const phoneInfo = document.querySelector('.phone-info');
+            if (phoneInfo) {
+                phoneInfo.textContent = 'PayNow to ' + getPayNowDisplay();
+            }
+        }
+
         function downloadQR() {
             const canvas = document.querySelector('#qrcode canvas');
             if (canvas) {
@@ -2469,7 +2718,7 @@
 
             const total = personData.reduce((sum, p) => sum + p.total, 0);
             text += `\n💰 Total: S$${total.toFixed(2)}`;
-            text += `\n\nPayNow to +65 8339 9525`;
+            text += `\n\nPayNow to ${getPayNowDisplay()}`;
 
             return text;
         }
