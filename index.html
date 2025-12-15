@@ -1536,9 +1536,109 @@
             color: #888;
             margin-left: 4px;
         }
+
+        /* Syncing Indicator */
+        .sync-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+        }
+
+        .sync-toast.show {
+            opacity: 1;
+        }
+
+        .sync-toast.syncing {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .sync-toast.receiving {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .sync-toast.synced {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .sync-toast.offline {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+        }
+
+        .sync-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .sync-icon {
+            font-size: 14px;
+        }
+
+        /* Live indicator dot */
+        .live-indicator {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .live-indicator.show {
+            opacity: 1;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .live-dot.active {
+            background: #fbbf24;
+            animation: pulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
     </style>
 </head>
 <body>
+    <!-- Sync Indicator Toast -->
+    <div class="sync-toast" id="syncToast">
+        <div class="sync-spinner" id="syncSpinner"></div>
+        <span class="sync-icon" id="syncIcon" style="display:none;"></span>
+        <span id="syncMessage">Syncing...</span>
+    </div>
+
     <div class="app-container">
         <div class="header">
             <h1>🍜 PayNow Splitter</h1>
@@ -2066,6 +2166,74 @@
             }
         }
 
+        // ==================== SYNC INDICATOR ====================
+
+        let syncToastTimeout = null;
+
+        // Show sync indicator
+        function showSyncIndicator(type, message) {
+            const toast = document.getElementById('syncToast');
+            const spinner = document.getElementById('syncSpinner');
+            const icon = document.getElementById('syncIcon');
+            const msg = document.getElementById('syncMessage');
+
+            if (!toast) return;
+
+            // Clear any pending hide timeout
+            if (syncToastTimeout) {
+                clearTimeout(syncToastTimeout);
+                syncToastTimeout = null;
+            }
+
+            // Reset classes
+            toast.className = 'sync-toast';
+
+            // Set message
+            msg.textContent = message;
+
+            // Configure based on type
+            switch(type) {
+                case 'syncing':
+                    toast.classList.add('syncing');
+                    spinner.style.display = 'block';
+                    icon.style.display = 'none';
+                    break;
+                case 'receiving':
+                    toast.classList.add('receiving');
+                    spinner.style.display = 'block';
+                    icon.style.display = 'none';
+                    break;
+                case 'synced':
+                    toast.classList.add('synced');
+                    spinner.style.display = 'none';
+                    icon.style.display = 'inline';
+                    icon.textContent = '✓';
+                    break;
+                case 'offline':
+                    toast.classList.add('offline');
+                    spinner.style.display = 'none';
+                    icon.style.display = 'inline';
+                    icon.textContent = '⚠';
+                    break;
+            }
+
+            // Show toast
+            toast.classList.add('show');
+        }
+
+        // Hide sync indicator (with optional delay)
+        function hideSyncIndicator(delay = 0) {
+            if (delay > 0) {
+                syncToastTimeout = setTimeout(() => {
+                    const toast = document.getElementById('syncToast');
+                    if (toast) toast.classList.remove('show');
+                }, delay);
+            } else {
+                const toast = document.getElementById('syncToast');
+                if (toast) toast.classList.remove('show');
+            }
+        }
+
         // Initialize
         function init() {
             loadSavedTeam();
@@ -2249,6 +2417,8 @@
             }, (error) => {
                 console.error('Firestore error:', error);
                 updateSyncStatus('offline');
+                showSyncIndicator('offline', 'Connection lost');
+                hideSyncIndicator(3000);
             });
         }
 
@@ -2320,6 +2490,9 @@
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(async () => {
                 try {
+                    // Show syncing indicator
+                    showSyncIndicator('syncing', 'Saving changes...');
+
                     // Generate session ID if not exists (based on today's date)
                     if (!currentSessionId) {
                         currentSessionId = new Date().toISOString().split('T')[0] + '_' + Date.now();
@@ -2347,8 +2520,14 @@
                         }
                     });
                     console.log('Session synced to Firebase');
+
+                    // Show synced indicator briefly
+                    showSyncIndicator('synced', 'Saved');
+                    hideSyncIndicator(1500);
                 } catch (e) {
                     console.error('Error syncing session to Firebase:', e);
+                    showSyncIndicator('offline', 'Sync failed');
+                    hideSyncIndicator(2000);
                 }
             }, 300);
         }
@@ -2358,6 +2537,9 @@
             if (!sessionData) return;
 
             isReceivingUpdate = true;
+
+            // Show receiving indicator
+            showSyncIndicator('receiving', 'Teammate updating...');
 
             // Update session ID
             currentSessionId = sessionData.sessionId || null;
@@ -2397,6 +2579,10 @@
             }
 
             calculate();
+
+            // Show synced and hide after delay
+            showSyncIndicator('synced', 'Updated');
+            hideSyncIndicator(1500);
 
             // Reset flag after a short delay
             setTimeout(() => { isReceivingUpdate = false; }, 100);
