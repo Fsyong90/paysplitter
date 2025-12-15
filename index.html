@@ -1493,9 +1493,152 @@
             font-size: 12px;
             margin: 0;
         }
+
+        /* Undo/Redo Buttons */
+        .undo-redo-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .undo-redo-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .undo-redo-btn:hover:not(:disabled) {
+            border-color: #7B2D8E;
+            background: #f8f4fa;
+        }
+
+        .undo-redo-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .undo-redo-btn .icon {
+            font-size: 16px;
+        }
+
+        .undo-redo-btn .shortcut {
+            font-size: 10px;
+            color: #888;
+            margin-left: 4px;
+        }
+
+        /* Syncing Indicator */
+        .sync-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+        }
+
+        .sync-toast.show {
+            opacity: 1;
+        }
+
+        .sync-toast.syncing {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .sync-toast.receiving {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .sync-toast.synced {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .sync-toast.offline {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+        }
+
+        .sync-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .sync-icon {
+            font-size: 14px;
+        }
+
+        /* Live indicator dot */
+        .live-indicator {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .live-indicator.show {
+            opacity: 1;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .live-dot.active {
+            background: #fbbf24;
+            animation: pulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
     </style>
 </head>
 <body>
+    <!-- Sync Indicator Toast -->
+    <div class="sync-toast" id="syncToast">
+        <div class="sync-spinner" id="syncSpinner"></div>
+        <span class="sync-icon" id="syncIcon" style="display:none;"></span>
+        <span id="syncMessage">Syncing...</span>
+    </div>
+
     <div class="app-container">
         <div class="header">
             <h1>🍜 PayNow Splitter</h1>
@@ -1566,6 +1709,20 @@
                 </div>
             </div>
 
+            <!-- Undo/Redo Buttons -->
+            <div class="undo-redo-bar">
+                <button class="undo-redo-btn" id="undoBtn" onclick="undo()" disabled style="opacity: 0.5;">
+                    <span class="icon">↩️</span>
+                    <span>Undo</span>
+                    <span class="shortcut">(Ctrl+Z)</span>
+                </button>
+                <button class="undo-redo-btn" id="redoBtn" onclick="redo()" disabled style="opacity: 0.5;">
+                    <span class="icon">↪️</span>
+                    <span>Redo</span>
+                    <span class="shortcut">(Ctrl+Y)</span>
+                </button>
+            </div>
+
             <!-- Quick Split Buttons -->
             <div class="quick-split-section" id="quickSplitSection">
                 <button class="quick-split-btn" onclick="splitAllEqually()">
@@ -1582,6 +1739,11 @@
                     <span class="icon">🔄</span>
                     <span class="label">Clear All</span>
                     <span class="desc">Reset assignments</span>
+                </button>
+                <button class="quick-split-btn" onclick="startNewSession()">
+                    <span class="icon">✨</span>
+                    <span class="label">New Session</span>
+                    <span class="desc">Start fresh bill</span>
                 </button>
             </div>
 
@@ -1611,39 +1773,39 @@
                         <span>Before GST</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="rate-input" id="serviceRate" value="10" min="0" max="100" step="0.5" oninput="calculate()">
+                        <input type="number" class="rate-input" id="serviceRate" value="10" min="0" max="100" step="0.5" oninput="calculate(); syncSessionToFirebase();">
                         <span>%</span>
                         <label class="switch">
-                            <input type="checkbox" id="hasService" onchange="calculate()">
+                            <input type="checkbox" id="hasService" onchange="calculate(); syncSessionToFirebase();">
                             <span class="slider"></span>
                         </label>
                     </div>
                 </div>
-                
+
                 <div class="option-row">
                     <div class="option-label">
                         <span>Discount</span>
                         <span>Before GST</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="discount-input" id="discountValue" placeholder="0" step="0.01" oninput="calculate()">
-                        <select class="discount-type" id="discountType" onchange="calculate()">
+                        <input type="number" class="discount-input" id="discountValue" placeholder="0" step="0.01" oninput="calculate(); syncSessionToFirebase();">
+                        <select class="discount-type" id="discountType" onchange="calculate(); syncSessionToFirebase();">
                             <option value="amount">S$</option>
                             <option value="percent">%</option>
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="option-row">
                     <div class="option-label">
                         <span>GST</span>
                         <span>After svc & discount</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="rate-input" id="gstRate" value="9" min="0" max="100" step="0.5" oninput="calculate()">
+                        <input type="number" class="rate-input" id="gstRate" value="9" min="0" max="100" step="0.5" oninput="calculate(); syncSessionToFirebase();">
                         <span>%</span>
                         <label class="switch">
-                            <input type="checkbox" id="hasGST" checked onchange="calculate()">
+                            <input type="checkbox" id="hasGST" checked onchange="calculate(); syncSessionToFirebase();">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -1655,7 +1817,7 @@
                         <span>Per person amount</span>
                     </div>
                     <div class="option-controls">
-                        <select class="rounding-select" id="roundingType" onchange="calculate()">
+                        <select class="rounding-select" id="roundingType" onchange="calculate(); syncSessionToFirebase();">
                             <option value="none">Exact</option>
                             <option value="0.10">$0.10</option>
                             <option value="0.50">$0.50</option>
@@ -1698,7 +1860,7 @@
                     <span>Expected Total (from receipt)</span>
                     <div class="expected-input-wrap">
                         <span>S$</span>
-                        <input type="number" class="expected-input" id="expectedTotal" placeholder="0.00" step="0.01" oninput="checkTotalMatch()">
+                        <input type="number" class="expected-input" id="expectedTotal" placeholder="0.00" step="0.01" oninput="checkTotalMatch(); syncSessionToFirebase();">
                     </div>
                 </div>
                 <div class="total-match" id="totalMatch"></div>
@@ -1846,6 +2008,232 @@
         let unsubscribeTeam = null;
         let unsubscribeHistory = null;
 
+        // Flag to prevent sync loops when receiving Firebase updates
+        let isReceivingUpdate = false;
+
+        // Current session ID (for one-receipt-one-history feature)
+        let currentSessionId = null;
+
+        // Undo/Redo stacks
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_UNDO_HISTORY = 50;
+        let isUndoingOrRedoing = false;
+
+        // Save current state for undo
+        function saveStateForUndo() {
+            if (isUndoingOrRedoing || isReceivingUpdate) return;
+
+            const state = {
+                people: JSON.parse(JSON.stringify(people)),
+                items: JSON.parse(JSON.stringify(items)),
+                paidStatus: JSON.parse(JSON.stringify(paidStatus)),
+                itemIdCounter: itemIdCounter,
+                billOptions: {
+                    hasService: document.getElementById('hasService')?.checked || false,
+                    serviceRate: parseFloat(document.getElementById('serviceRate')?.value) || 10,
+                    hasGST: document.getElementById('hasGST')?.checked !== false,
+                    gstRate: parseFloat(document.getElementById('gstRate')?.value) || 9,
+                    discountValue: parseFloat(document.getElementById('discountValue')?.value) || 0,
+                    discountType: document.getElementById('discountType')?.value || 'amount',
+                    roundingType: document.getElementById('roundingType')?.value || 'none',
+                    expectedTotal: parseFloat(document.getElementById('expectedTotal')?.value) || 0
+                }
+            };
+
+            undoStack.push(state);
+            if (undoStack.length > MAX_UNDO_HISTORY) {
+                undoStack.shift(); // Remove oldest state
+            }
+
+            // Clear redo stack when new action is performed
+            redoStack = [];
+
+            updateUndoRedoButtons();
+        }
+
+        // Undo last action
+        function undo() {
+            if (undoStack.length === 0) {
+                showToast('Nothing to undo');
+                return;
+            }
+
+            isUndoingOrRedoing = true;
+
+            // Save current state to redo stack
+            const currentState = {
+                people: JSON.parse(JSON.stringify(people)),
+                items: JSON.parse(JSON.stringify(items)),
+                paidStatus: JSON.parse(JSON.stringify(paidStatus)),
+                itemIdCounter: itemIdCounter,
+                billOptions: {
+                    hasService: document.getElementById('hasService').checked,
+                    serviceRate: parseFloat(document.getElementById('serviceRate').value) || 10,
+                    hasGST: document.getElementById('hasGST').checked,
+                    gstRate: parseFloat(document.getElementById('gstRate').value) || 9,
+                    discountValue: parseFloat(document.getElementById('discountValue').value) || 0,
+                    discountType: document.getElementById('discountType').value,
+                    roundingType: document.getElementById('roundingType').value,
+                    expectedTotal: parseFloat(document.getElementById('expectedTotal').value) || 0
+                }
+            };
+            redoStack.push(currentState);
+
+            // Restore previous state
+            const previousState = undoStack.pop();
+            restoreState(previousState);
+
+            isUndoingOrRedoing = false;
+            syncSessionToFirebase();
+            showToast('Undone');
+        }
+
+        // Redo last undone action
+        function redo() {
+            if (redoStack.length === 0) {
+                showToast('Nothing to redo');
+                return;
+            }
+
+            isUndoingOrRedoing = true;
+
+            // Save current state to undo stack
+            const currentState = {
+                people: JSON.parse(JSON.stringify(people)),
+                items: JSON.parse(JSON.stringify(items)),
+                paidStatus: JSON.parse(JSON.stringify(paidStatus)),
+                itemIdCounter: itemIdCounter,
+                billOptions: {
+                    hasService: document.getElementById('hasService').checked,
+                    serviceRate: parseFloat(document.getElementById('serviceRate').value) || 10,
+                    hasGST: document.getElementById('hasGST').checked,
+                    gstRate: parseFloat(document.getElementById('gstRate').value) || 9,
+                    discountValue: parseFloat(document.getElementById('discountValue').value) || 0,
+                    discountType: document.getElementById('discountType').value,
+                    roundingType: document.getElementById('roundingType').value,
+                    expectedTotal: parseFloat(document.getElementById('expectedTotal').value) || 0
+                }
+            };
+            undoStack.push(currentState);
+
+            // Restore redo state
+            const redoState = redoStack.pop();
+            restoreState(redoState);
+
+            isUndoingOrRedoing = false;
+            syncSessionToFirebase();
+            showToast('Redone');
+        }
+
+        // Restore a saved state
+        function restoreState(state) {
+            people = state.people;
+            items = state.items;
+            paidStatus = state.paidStatus;
+            itemIdCounter = state.itemIdCounter;
+
+            // Restore bill options
+            if (state.billOptions) {
+                document.getElementById('hasService').checked = state.billOptions.hasService;
+                document.getElementById('serviceRate').value = state.billOptions.serviceRate;
+                document.getElementById('hasGST').checked = state.billOptions.hasGST;
+                document.getElementById('gstRate').value = state.billOptions.gstRate;
+                document.getElementById('discountValue').value = state.billOptions.discountValue || '';
+                document.getElementById('discountType').value = state.billOptions.discountType;
+                document.getElementById('roundingType').value = state.billOptions.roundingType;
+                document.getElementById('expectedTotal').value = state.billOptions.expectedTotal || '';
+            }
+
+            renderPeople();
+            renderItems();
+            renderSavedTeam();
+            calculate();
+            updateUndoRedoButtons();
+        }
+
+        // Update undo/redo button states
+        function updateUndoRedoButtons() {
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            if (undoBtn) {
+                undoBtn.disabled = undoStack.length === 0;
+                undoBtn.style.opacity = undoStack.length === 0 ? '0.5' : '1';
+            }
+            if (redoBtn) {
+                redoBtn.disabled = redoStack.length === 0;
+                redoBtn.style.opacity = redoStack.length === 0 ? '0.5' : '1';
+            }
+        }
+
+        // ==================== SYNC INDICATOR ====================
+
+        let syncToastTimeout = null;
+
+        // Show sync indicator
+        function showSyncIndicator(type, message) {
+            const toast = document.getElementById('syncToast');
+            const spinner = document.getElementById('syncSpinner');
+            const icon = document.getElementById('syncIcon');
+            const msg = document.getElementById('syncMessage');
+
+            if (!toast) return;
+
+            // Clear any pending hide timeout
+            if (syncToastTimeout) {
+                clearTimeout(syncToastTimeout);
+                syncToastTimeout = null;
+            }
+
+            // Reset classes
+            toast.className = 'sync-toast';
+
+            // Set message
+            msg.textContent = message;
+
+            // Configure based on type
+            switch(type) {
+                case 'syncing':
+                    toast.classList.add('syncing');
+                    spinner.style.display = 'block';
+                    icon.style.display = 'none';
+                    break;
+                case 'receiving':
+                    toast.classList.add('receiving');
+                    spinner.style.display = 'block';
+                    icon.style.display = 'none';
+                    break;
+                case 'synced':
+                    toast.classList.add('synced');
+                    spinner.style.display = 'none';
+                    icon.style.display = 'inline';
+                    icon.textContent = '✓';
+                    break;
+                case 'offline':
+                    toast.classList.add('offline');
+                    spinner.style.display = 'none';
+                    icon.style.display = 'inline';
+                    icon.textContent = '⚠';
+                    break;
+            }
+
+            // Show toast
+            toast.classList.add('show');
+        }
+
+        // Hide sync indicator (with optional delay)
+        function hideSyncIndicator(delay = 0) {
+            if (delay > 0) {
+                syncToastTimeout = setTimeout(() => {
+                    const toast = document.getElementById('syncToast');
+                    if (toast) toast.classList.remove('show');
+                }, delay);
+            } else {
+                const toast = document.getElementById('syncToast');
+                if (toast) toast.classList.remove('show');
+            }
+        }
+
         // Initialize
         function init() {
             loadSavedTeam();
@@ -1860,6 +2248,33 @@
             renderTeamCodeUI();
             updatePayNowDisplay();
             generateCoffeeQR();
+            setupKeyboardShortcuts();
+        }
+
+        // Setup keyboard shortcuts for undo/redo
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', function(e) {
+                // Check if user is typing in an input field
+                const isInputFocused = document.activeElement.tagName === 'INPUT' ||
+                                       document.activeElement.tagName === 'TEXTAREA' ||
+                                       document.activeElement.tagName === 'SELECT';
+
+                // Ctrl+Z or Cmd+Z for Undo
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                    if (!isInputFocused) {
+                        e.preventDefault();
+                        undo();
+                    }
+                }
+
+                // Ctrl+Y or Cmd+Y or Ctrl+Shift+Z for Redo
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                    if (!isInputFocused) {
+                        e.preventDefault();
+                        redo();
+                    }
+                }
+            });
         }
 
         // Generate Buy Me a Coffee QR code
@@ -1976,7 +2391,7 @@
 
             const teamRef = db.collection('teams').doc(code);
 
-            // Listen for teammate changes
+            // Listen for all team data changes (including current session)
             unsubscribeTeam = teamRef.onSnapshot((doc) => {
                 if (doc.exists) {
                     const data = doc.data();
@@ -1997,11 +2412,17 @@
                     } else {
                         hideReceiptPreview();
                     }
+                    // Real-time session sync - load current session from other team members
+                    if (data.currentSession && !isReceivingUpdate) {
+                        loadSessionFromFirebase(data.currentSession);
+                    }
                     updateSyncStatus('synced');
                 }
             }, (error) => {
                 console.error('Firestore error:', error);
                 updateSyncStatus('offline');
+                showSyncIndicator('offline', 'Connection lost');
+                hideSyncIndicator(3000);
             });
         }
 
@@ -2062,6 +2483,113 @@
             } catch (e) {
                 console.error('Error saving history to Firebase:', e);
             }
+        }
+
+        // Sync current session to Firebase (real-time collaboration)
+        let syncTimeout = null;
+        async function syncSessionToFirebase() {
+            if (!currentTeamCode || isReceivingUpdate) return;
+
+            // Debounce: wait 300ms before syncing to avoid too many writes
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(async () => {
+                try {
+                    // Show syncing indicator
+                    showSyncIndicator('syncing', 'Saving changes...');
+
+                    // Generate session ID if not exists (based on today's date)
+                    if (!currentSessionId) {
+                        currentSessionId = new Date().toISOString().split('T')[0] + '_' + Date.now();
+                    }
+
+                    const billOptions = {
+                        hasService: document.getElementById('hasService').checked,
+                        serviceRate: parseFloat(document.getElementById('serviceRate').value) || 10,
+                        hasGST: document.getElementById('hasGST').checked,
+                        gstRate: parseFloat(document.getElementById('gstRate').value) || 9,
+                        discountValue: parseFloat(document.getElementById('discountValue').value) || 0,
+                        discountType: document.getElementById('discountType').value,
+                        roundingType: document.getElementById('roundingType').value,
+                        expectedTotal: parseFloat(document.getElementById('expectedTotal').value) || 0
+                    };
+
+                    await db.collection('teams').doc(currentTeamCode).update({
+                        currentSession: {
+                            sessionId: currentSessionId,
+                            people: people,
+                            items: items,
+                            paidStatus: paidStatus,
+                            billOptions: billOptions,
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        }
+                    });
+                    console.log('Session synced to Firebase');
+
+                    // Show synced indicator briefly
+                    showSyncIndicator('synced', 'Saved');
+                    hideSyncIndicator(1500);
+                } catch (e) {
+                    console.error('Error syncing session to Firebase:', e);
+                    showSyncIndicator('offline', 'Sync failed');
+                    hideSyncIndicator(2000);
+                }
+            }, 300);
+        }
+
+        // Load session from Firebase data
+        function loadSessionFromFirebase(sessionData) {
+            if (!sessionData) return;
+
+            isReceivingUpdate = true;
+
+            // Show receiving indicator
+            showSyncIndicator('receiving', 'Teammate updating...');
+
+            // Update session ID
+            currentSessionId = sessionData.sessionId || null;
+
+            // Update people
+            if (sessionData.people) {
+                people = sessionData.people;
+                renderPeople();
+                renderSavedTeam();
+            }
+
+            // Update items
+            if (sessionData.items) {
+                items = sessionData.items;
+                itemIdCounter = Math.max(...items.map(i => i.id), 0) + 1;
+                renderItems();
+            }
+
+            // Update paid status
+            if (sessionData.paidStatus) {
+                paidStatus = sessionData.paidStatus;
+            }
+
+            // Update bill options
+            if (sessionData.billOptions) {
+                const opts = sessionData.billOptions;
+                document.getElementById('hasService').checked = opts.hasService || false;
+                document.getElementById('serviceRate').value = opts.serviceRate || 10;
+                document.getElementById('hasGST').checked = opts.hasGST !== false;
+                document.getElementById('gstRate').value = opts.gstRate || 9;
+                document.getElementById('discountValue').value = opts.discountValue || '';
+                document.getElementById('discountType').value = opts.discountType || 'amount';
+                document.getElementById('roundingType').value = opts.roundingType || 'none';
+                if (opts.expectedTotal > 0) {
+                    document.getElementById('expectedTotal').value = opts.expectedTotal;
+                }
+            }
+
+            calculate();
+
+            // Show synced and hide after delay
+            showSyncIndicator('synced', 'Updated');
+            hideSyncIndicator(1500);
+
+            // Reset flag after a short delay
+            setTimeout(() => { isReceivingUpdate = false; }, 100);
         }
 
         // Load saved team from localStorage
@@ -2154,12 +2682,14 @@
                 return;
             }
 
+            saveStateForUndo(); // Save state before change
             items.forEach(item => {
                 item.people = [...people]; // Assign everyone to every item
             });
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast('All items split equally!');
         }
 
@@ -2170,6 +2700,7 @@
                 return;
             }
 
+            saveStateForUndo(); // Save state before change
             // Clear all assignments so user can manually assign
             items.forEach(item => {
                 item.people = [];
@@ -2177,22 +2708,70 @@
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast('Cleared! Now assign each item to its owner');
         }
 
         // Clear all item assignments
         function clearAllAssignments() {
+            saveStateForUndo(); // Save state before change
             items.forEach(item => {
                 item.people = [];
             });
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast('All assignments cleared');
+        }
+
+        // Start a new session (fresh bill)
+        function startNewSession() {
+            if (items.length > 0 || people.length > 0) {
+                if (!confirm('Start a new session? Current data will be cleared.\n\nTip: Save to history first if you want to keep it.')) {
+                    return;
+                }
+            }
+
+            saveStateForUndo(); // Save state before change (allows undo of new session)
+
+            // Reset session
+            currentSessionId = new Date().toISOString().split('T')[0] + '_' + Date.now();
+            currentReceiptUrl = null;
+            people = [];
+            items = [];
+            itemIdCounter = 0;
+            paidStatus = {};
+
+            // Reset bill options to defaults
+            document.getElementById('hasService').checked = false;
+            document.getElementById('serviceRate').value = 10;
+            document.getElementById('hasGST').checked = true;
+            document.getElementById('gstRate').value = 9;
+            document.getElementById('discountValue').value = '';
+            document.getElementById('discountType').value = 'amount';
+            document.getElementById('roundingType').value = 'none';
+            document.getElementById('expectedTotal').value = '';
+
+            // Clear undo/redo stacks for fresh session
+            undoStack = [];
+            redoStack = [];
+            updateUndoRedoButtons();
+
+            // Add one empty item
+            addItem();
+
+            renderPeople();
+            renderSavedTeam();
+            calculate();
+            syncSessionToFirebase(); // Sync new session to team
+            hideReceiptPreview();
+            showToast('New session started');
         }
 
         // Select all team members
         function selectAllTeam() {
+            saveStateForUndo(); // Save state before change
             savedTeam.forEach(name => {
                 if (!people.includes(name)) {
                     people.push(name);
@@ -2207,16 +2786,19 @@
             renderItems();
             renderSavedTeam();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
 
         // Deselect all team members
         function selectNoneTeam() {
+            saveStateForUndo(); // Save state before change
             people = [];
             items.forEach(item => item.people = []);
             renderPeople();
             renderItems();
             renderSavedTeam();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
 
         // Tab switching
@@ -2240,6 +2822,7 @@
             if (!inputName) return;
 
             if (!people.includes(inputName)) {
+                saveStateForUndo(); // Save state before change
                 people.push(inputName);
                 // Also save to team if new
                 if (!savedTeam.includes(inputName)) {
@@ -2250,12 +2833,14 @@
                 renderItems();
                 renderSavedTeam();
                 calculate();
+                syncSessionToFirebase(); // Real-time sync
             }
 
             document.getElementById('newPersonName').value = '';
         }
-        
+
         function removePerson(name) {
+            saveStateForUndo(); // Save state before change
             people = people.filter(p => p !== name);
             // Remove from all items
             items.forEach(item => {
@@ -2264,6 +2849,7 @@
             renderPeople();
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
         
         function renderPeople() {
@@ -2277,6 +2863,7 @@
         }
         
         function addItem() {
+            saveStateForUndo(); // Save state before change
             items.push({
                 id: itemIdCounter++,
                 name: '',
@@ -2284,25 +2871,43 @@
                 people: [...people] // Default: everyone shares
             });
             renderItems();
+            syncSessionToFirebase(); // Real-time sync
         }
-        
+
         function removeItem(id) {
+            saveStateForUndo(); // Save state before change
             items = items.filter(i => i.id !== id);
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
-        
+
+        // Debounce timer for updateItem to avoid saving state on every keystroke
+        let updateItemTimer = null;
+        let lastSavedItemState = null;
+
         function updateItem(id, field, value) {
             const item = items.find(i => i.id === id);
             if (item) {
+                // Save state only once when user starts typing (debounced)
+                if (!updateItemTimer) {
+                    saveStateForUndo();
+                }
+                clearTimeout(updateItemTimer);
+                updateItemTimer = setTimeout(() => {
+                    updateItemTimer = null;
+                }, 1000); // Reset after 1 second of inactivity
+
                 item[field] = field === 'price' ? (parseFloat(value) || 0) : value;
                 calculate();
+                syncSessionToFirebase(); // Real-time sync
             }
         }
-        
+
         function togglePerson(itemId, person) {
             const item = items.find(i => i.id === itemId);
             if (item) {
+                saveStateForUndo(); // Save state before change
                 if (item.people.includes(person)) {
                     item.people = item.people.filter(p => p !== person);
                 } else {
@@ -2310,6 +2915,7 @@
                 }
                 renderItems();
                 calculate();
+                syncSessionToFirebase(); // Real-time sync
             }
         }
         
@@ -2552,8 +3158,10 @@
 
         // Toggle paid status
         function togglePaid(name) {
+            saveStateForUndo(); // Save state before change
             paidStatus[name] = !paidStatus[name];
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast(paidStatus[name] ? `${name} marked as paid` : `${name} marked as unpaid`);
         }
         
@@ -2876,7 +3484,7 @@
 
         // ==================== HISTORY ====================
 
-        // Save current split to history
+        // Save current split to history (one receipt = one history entry)
         function saveToHistory() {
             const today = new Date();
             const personData = getPersonData();
@@ -2884,6 +3492,8 @@
 
             const entry = {
                 id: Date.now(),
+                sessionId: currentSessionId, // Link to current session
+                receiptUrl: currentReceiptUrl, // Link to receipt if any
                 date: today.toISOString(),
                 people: [...people],
                 items: items.map(it => ({ name: it.name, price: it.price, people: it.people })),
@@ -2891,11 +3501,30 @@
                 breakdown: personData
             };
 
-            splitHistory.unshift(entry);
-            if (splitHistory.length > 50) splitHistory.pop(); // Keep last 50
+            // Check if there's an existing entry for this session (one receipt = one history)
+            let existingIndex = -1;
+            if (currentSessionId) {
+                existingIndex = splitHistory.findIndex(h => h.sessionId === currentSessionId);
+            }
+            // Also check by receipt URL if no session match
+            if (existingIndex === -1 && currentReceiptUrl) {
+                existingIndex = splitHistory.findIndex(h => h.receiptUrl === currentReceiptUrl);
+            }
+
+            if (existingIndex !== -1) {
+                // Update existing entry instead of creating new
+                entry.id = splitHistory[existingIndex].id; // Keep original ID
+                splitHistory[existingIndex] = entry;
+                showToast('Updated existing history entry');
+            } else {
+                // Create new entry
+                splitHistory.unshift(entry);
+                if (splitHistory.length > 50) splitHistory.pop(); // Keep last 50
+                showToast('Saved to history');
+            }
+
             saveHistoryToStorage();
             renderHistory();
-            showToast('Saved to history');
         }
 
         // Render history list
@@ -2928,6 +3557,10 @@
             const entry = splitHistory.find(e => e.id === id);
             if (!entry) return;
 
+            // Set session ID so future saves update this entry
+            currentSessionId = entry.sessionId || null;
+            currentReceiptUrl = entry.receiptUrl || null;
+
             people = [...entry.people];
             items = entry.items.map((it, idx) => ({
                 id: idx,
@@ -2941,6 +3574,7 @@
             renderItems();
             renderSavedTeam();
             calculate();
+            syncSessionToFirebase(); // Sync loaded session to team
             switchTab('split');
             showToast('Loaded from history');
         }
@@ -3237,6 +3871,9 @@
         // Confirm and add selected OCR items
         function confirmPreview() {
             const selected = pendingOcrItems.filter(i => i.selected);
+            if (selected.length > 0) {
+                saveStateForUndo(); // Save state before change
+            }
             selected.forEach(item => {
                 items.push({
                     id: itemIdCounter++,
@@ -3248,6 +3885,7 @@
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             closePreview();
             showToast(`Added ${selected.length} items`);
         }
