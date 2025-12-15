@@ -1493,6 +1493,49 @@
             font-size: 12px;
             margin: 0;
         }
+
+        /* Undo/Redo Buttons */
+        .undo-redo-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .undo-redo-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .undo-redo-btn:hover:not(:disabled) {
+            border-color: #7B2D8E;
+            background: #f8f4fa;
+        }
+
+        .undo-redo-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .undo-redo-btn .icon {
+            font-size: 16px;
+        }
+
+        .undo-redo-btn .shortcut {
+            font-size: 10px;
+            color: #888;
+            margin-left: 4px;
+        }
     </style>
 </head>
 <body>
@@ -1564,6 +1607,20 @@
                         <div class="date-badge" id="receiptDate"></div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Undo/Redo Buttons -->
+            <div class="undo-redo-bar">
+                <button class="undo-redo-btn" id="undoBtn" onclick="undo()" disabled style="opacity: 0.5;">
+                    <span class="icon">↩️</span>
+                    <span>Undo</span>
+                    <span class="shortcut">(Ctrl+Z)</span>
+                </button>
+                <button class="undo-redo-btn" id="redoBtn" onclick="redo()" disabled style="opacity: 0.5;">
+                    <span class="icon">↪️</span>
+                    <span>Redo</span>
+                    <span class="shortcut">(Ctrl+Y)</span>
+                </button>
             </div>
 
             <!-- Quick Split Buttons -->
@@ -1857,6 +1914,158 @@
         // Current session ID (for one-receipt-one-history feature)
         let currentSessionId = null;
 
+        // Undo/Redo stacks
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_UNDO_HISTORY = 50;
+        let isUndoingOrRedoing = false;
+
+        // Save current state for undo
+        function saveStateForUndo() {
+            if (isUndoingOrRedoing || isReceivingUpdate) return;
+
+            const state = {
+                people: JSON.parse(JSON.stringify(people)),
+                items: JSON.parse(JSON.stringify(items)),
+                paidStatus: JSON.parse(JSON.stringify(paidStatus)),
+                itemIdCounter: itemIdCounter,
+                billOptions: {
+                    hasService: document.getElementById('hasService')?.checked || false,
+                    serviceRate: parseFloat(document.getElementById('serviceRate')?.value) || 10,
+                    hasGST: document.getElementById('hasGST')?.checked !== false,
+                    gstRate: parseFloat(document.getElementById('gstRate')?.value) || 9,
+                    discountValue: parseFloat(document.getElementById('discountValue')?.value) || 0,
+                    discountType: document.getElementById('discountType')?.value || 'amount',
+                    roundingType: document.getElementById('roundingType')?.value || 'none',
+                    expectedTotal: parseFloat(document.getElementById('expectedTotal')?.value) || 0
+                }
+            };
+
+            undoStack.push(state);
+            if (undoStack.length > MAX_UNDO_HISTORY) {
+                undoStack.shift(); // Remove oldest state
+            }
+
+            // Clear redo stack when new action is performed
+            redoStack = [];
+
+            updateUndoRedoButtons();
+        }
+
+        // Undo last action
+        function undo() {
+            if (undoStack.length === 0) {
+                showToast('Nothing to undo');
+                return;
+            }
+
+            isUndoingOrRedoing = true;
+
+            // Save current state to redo stack
+            const currentState = {
+                people: JSON.parse(JSON.stringify(people)),
+                items: JSON.parse(JSON.stringify(items)),
+                paidStatus: JSON.parse(JSON.stringify(paidStatus)),
+                itemIdCounter: itemIdCounter,
+                billOptions: {
+                    hasService: document.getElementById('hasService').checked,
+                    serviceRate: parseFloat(document.getElementById('serviceRate').value) || 10,
+                    hasGST: document.getElementById('hasGST').checked,
+                    gstRate: parseFloat(document.getElementById('gstRate').value) || 9,
+                    discountValue: parseFloat(document.getElementById('discountValue').value) || 0,
+                    discountType: document.getElementById('discountType').value,
+                    roundingType: document.getElementById('roundingType').value,
+                    expectedTotal: parseFloat(document.getElementById('expectedTotal').value) || 0
+                }
+            };
+            redoStack.push(currentState);
+
+            // Restore previous state
+            const previousState = undoStack.pop();
+            restoreState(previousState);
+
+            isUndoingOrRedoing = false;
+            syncSessionToFirebase();
+            showToast('Undone');
+        }
+
+        // Redo last undone action
+        function redo() {
+            if (redoStack.length === 0) {
+                showToast('Nothing to redo');
+                return;
+            }
+
+            isUndoingOrRedoing = true;
+
+            // Save current state to undo stack
+            const currentState = {
+                people: JSON.parse(JSON.stringify(people)),
+                items: JSON.parse(JSON.stringify(items)),
+                paidStatus: JSON.parse(JSON.stringify(paidStatus)),
+                itemIdCounter: itemIdCounter,
+                billOptions: {
+                    hasService: document.getElementById('hasService').checked,
+                    serviceRate: parseFloat(document.getElementById('serviceRate').value) || 10,
+                    hasGST: document.getElementById('hasGST').checked,
+                    gstRate: parseFloat(document.getElementById('gstRate').value) || 9,
+                    discountValue: parseFloat(document.getElementById('discountValue').value) || 0,
+                    discountType: document.getElementById('discountType').value,
+                    roundingType: document.getElementById('roundingType').value,
+                    expectedTotal: parseFloat(document.getElementById('expectedTotal').value) || 0
+                }
+            };
+            undoStack.push(currentState);
+
+            // Restore redo state
+            const redoState = redoStack.pop();
+            restoreState(redoState);
+
+            isUndoingOrRedoing = false;
+            syncSessionToFirebase();
+            showToast('Redone');
+        }
+
+        // Restore a saved state
+        function restoreState(state) {
+            people = state.people;
+            items = state.items;
+            paidStatus = state.paidStatus;
+            itemIdCounter = state.itemIdCounter;
+
+            // Restore bill options
+            if (state.billOptions) {
+                document.getElementById('hasService').checked = state.billOptions.hasService;
+                document.getElementById('serviceRate').value = state.billOptions.serviceRate;
+                document.getElementById('hasGST').checked = state.billOptions.hasGST;
+                document.getElementById('gstRate').value = state.billOptions.gstRate;
+                document.getElementById('discountValue').value = state.billOptions.discountValue || '';
+                document.getElementById('discountType').value = state.billOptions.discountType;
+                document.getElementById('roundingType').value = state.billOptions.roundingType;
+                document.getElementById('expectedTotal').value = state.billOptions.expectedTotal || '';
+            }
+
+            renderPeople();
+            renderItems();
+            renderSavedTeam();
+            calculate();
+            updateUndoRedoButtons();
+        }
+
+        // Update undo/redo button states
+        function updateUndoRedoButtons() {
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            if (undoBtn) {
+                undoBtn.disabled = undoStack.length === 0;
+                undoBtn.style.opacity = undoStack.length === 0 ? '0.5' : '1';
+            }
+            if (redoBtn) {
+                redoBtn.disabled = redoStack.length === 0;
+                redoBtn.style.opacity = redoStack.length === 0 ? '0.5' : '1';
+            }
+        }
+
         // Initialize
         function init() {
             loadSavedTeam();
@@ -1871,6 +2080,33 @@
             renderTeamCodeUI();
             updatePayNowDisplay();
             generateCoffeeQR();
+            setupKeyboardShortcuts();
+        }
+
+        // Setup keyboard shortcuts for undo/redo
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', function(e) {
+                // Check if user is typing in an input field
+                const isInputFocused = document.activeElement.tagName === 'INPUT' ||
+                                       document.activeElement.tagName === 'TEXTAREA' ||
+                                       document.activeElement.tagName === 'SELECT';
+
+                // Ctrl+Z or Cmd+Z for Undo
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                    if (!isInputFocused) {
+                        e.preventDefault();
+                        undo();
+                    }
+                }
+
+                // Ctrl+Y or Cmd+Y or Ctrl+Shift+Z for Redo
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                    if (!isInputFocused) {
+                        e.preventDefault();
+                        redo();
+                    }
+                }
+            });
         }
 
         // Generate Buy Me a Coffee QR code
@@ -2256,6 +2492,7 @@
                 return;
             }
 
+            saveStateForUndo(); // Save state before change
             items.forEach(item => {
                 item.people = [...people]; // Assign everyone to every item
             });
@@ -2273,6 +2510,7 @@
                 return;
             }
 
+            saveStateForUndo(); // Save state before change
             // Clear all assignments so user can manually assign
             items.forEach(item => {
                 item.people = [];
@@ -2286,6 +2524,7 @@
 
         // Clear all item assignments
         function clearAllAssignments() {
+            saveStateForUndo(); // Save state before change
             items.forEach(item => {
                 item.people = [];
             });
@@ -2303,6 +2542,8 @@
                     return;
                 }
             }
+
+            saveStateForUndo(); // Save state before change (allows undo of new session)
 
             // Reset session
             currentSessionId = new Date().toISOString().split('T')[0] + '_' + Date.now();
@@ -2322,6 +2563,11 @@
             document.getElementById('roundingType').value = 'none';
             document.getElementById('expectedTotal').value = '';
 
+            // Clear undo/redo stacks for fresh session
+            undoStack = [];
+            redoStack = [];
+            updateUndoRedoButtons();
+
             // Add one empty item
             addItem();
 
@@ -2335,6 +2581,7 @@
 
         // Select all team members
         function selectAllTeam() {
+            saveStateForUndo(); // Save state before change
             savedTeam.forEach(name => {
                 if (!people.includes(name)) {
                     people.push(name);
@@ -2354,6 +2601,7 @@
 
         // Deselect all team members
         function selectNoneTeam() {
+            saveStateForUndo(); // Save state before change
             people = [];
             items.forEach(item => item.people = []);
             renderPeople();
@@ -2384,6 +2632,7 @@
             if (!inputName) return;
 
             if (!people.includes(inputName)) {
+                saveStateForUndo(); // Save state before change
                 people.push(inputName);
                 // Also save to team if new
                 if (!savedTeam.includes(inputName)) {
@@ -2401,6 +2650,7 @@
         }
 
         function removePerson(name) {
+            saveStateForUndo(); // Save state before change
             people = people.filter(p => p !== name);
             // Remove from all items
             items.forEach(item => {
@@ -2423,6 +2673,7 @@
         }
         
         function addItem() {
+            saveStateForUndo(); // Save state before change
             items.push({
                 id: itemIdCounter++,
                 name: '',
@@ -2434,15 +2685,29 @@
         }
 
         function removeItem(id) {
+            saveStateForUndo(); // Save state before change
             items = items.filter(i => i.id !== id);
             renderItems();
             calculate();
             syncSessionToFirebase(); // Real-time sync
         }
 
+        // Debounce timer for updateItem to avoid saving state on every keystroke
+        let updateItemTimer = null;
+        let lastSavedItemState = null;
+
         function updateItem(id, field, value) {
             const item = items.find(i => i.id === id);
             if (item) {
+                // Save state only once when user starts typing (debounced)
+                if (!updateItemTimer) {
+                    saveStateForUndo();
+                }
+                clearTimeout(updateItemTimer);
+                updateItemTimer = setTimeout(() => {
+                    updateItemTimer = null;
+                }, 1000); // Reset after 1 second of inactivity
+
                 item[field] = field === 'price' ? (parseFloat(value) || 0) : value;
                 calculate();
                 syncSessionToFirebase(); // Real-time sync
@@ -2452,6 +2717,7 @@
         function togglePerson(itemId, person) {
             const item = items.find(i => i.id === itemId);
             if (item) {
+                saveStateForUndo(); // Save state before change
                 if (item.people.includes(person)) {
                     item.people = item.people.filter(p => p !== person);
                 } else {
@@ -2702,6 +2968,7 @@
 
         // Toggle paid status
         function togglePaid(name) {
+            saveStateForUndo(); // Save state before change
             paidStatus[name] = !paidStatus[name];
             calculate();
             syncSessionToFirebase(); // Real-time sync
@@ -3377,6 +3644,9 @@
         // Confirm and add selected OCR items
         function confirmPreview() {
             const selected = pendingOcrItems.filter(i => i.selected);
+            if (selected.length > 0) {
+                saveStateForUndo(); // Save state before change
+            }
             selected.forEach(item => {
                 items.push({
                     id: itemIdCounter++,
