@@ -1583,6 +1583,11 @@
                     <span class="label">Clear All</span>
                     <span class="desc">Reset assignments</span>
                 </button>
+                <button class="quick-split-btn" onclick="startNewSession()">
+                    <span class="icon">✨</span>
+                    <span class="label">New Session</span>
+                    <span class="desc">Start fresh bill</span>
+                </button>
             </div>
 
             <!-- AI Receipt Scanner -->
@@ -1611,39 +1616,39 @@
                         <span>Before GST</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="rate-input" id="serviceRate" value="10" min="0" max="100" step="0.5" oninput="calculate()">
+                        <input type="number" class="rate-input" id="serviceRate" value="10" min="0" max="100" step="0.5" oninput="calculate(); syncSessionToFirebase();">
                         <span>%</span>
                         <label class="switch">
-                            <input type="checkbox" id="hasService" onchange="calculate()">
+                            <input type="checkbox" id="hasService" onchange="calculate(); syncSessionToFirebase();">
                             <span class="slider"></span>
                         </label>
                     </div>
                 </div>
-                
+
                 <div class="option-row">
                     <div class="option-label">
                         <span>Discount</span>
                         <span>Before GST</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="discount-input" id="discountValue" placeholder="0" step="0.01" oninput="calculate()">
-                        <select class="discount-type" id="discountType" onchange="calculate()">
+                        <input type="number" class="discount-input" id="discountValue" placeholder="0" step="0.01" oninput="calculate(); syncSessionToFirebase();">
+                        <select class="discount-type" id="discountType" onchange="calculate(); syncSessionToFirebase();">
                             <option value="amount">S$</option>
                             <option value="percent">%</option>
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="option-row">
                     <div class="option-label">
                         <span>GST</span>
                         <span>After svc & discount</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="rate-input" id="gstRate" value="9" min="0" max="100" step="0.5" oninput="calculate()">
+                        <input type="number" class="rate-input" id="gstRate" value="9" min="0" max="100" step="0.5" oninput="calculate(); syncSessionToFirebase();">
                         <span>%</span>
                         <label class="switch">
-                            <input type="checkbox" id="hasGST" checked onchange="calculate()">
+                            <input type="checkbox" id="hasGST" checked onchange="calculate(); syncSessionToFirebase();">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -1655,7 +1660,7 @@
                         <span>Per person amount</span>
                     </div>
                     <div class="option-controls">
-                        <select class="rounding-select" id="roundingType" onchange="calculate()">
+                        <select class="rounding-select" id="roundingType" onchange="calculate(); syncSessionToFirebase();">
                             <option value="none">Exact</option>
                             <option value="0.10">$0.10</option>
                             <option value="0.50">$0.50</option>
@@ -1698,7 +1703,7 @@
                     <span>Expected Total (from receipt)</span>
                     <div class="expected-input-wrap">
                         <span>S$</span>
-                        <input type="number" class="expected-input" id="expectedTotal" placeholder="0.00" step="0.01" oninput="checkTotalMatch()">
+                        <input type="number" class="expected-input" id="expectedTotal" placeholder="0.00" step="0.01" oninput="checkTotalMatch(); syncSessionToFirebase();">
                     </div>
                 </div>
                 <div class="total-match" id="totalMatch"></div>
@@ -1846,6 +1851,12 @@
         let unsubscribeTeam = null;
         let unsubscribeHistory = null;
 
+        // Flag to prevent sync loops when receiving Firebase updates
+        let isReceivingUpdate = false;
+
+        // Current session ID (for one-receipt-one-history feature)
+        let currentSessionId = null;
+
         // Initialize
         function init() {
             loadSavedTeam();
@@ -1972,7 +1983,7 @@
 
             const teamRef = db.collection('teams').doc(code);
 
-            // Listen for teammate changes
+            // Listen for all team data changes (including current session)
             unsubscribeTeam = teamRef.onSnapshot((doc) => {
                 if (doc.exists) {
                     const data = doc.data();
@@ -1992,6 +2003,10 @@
                         showReceiptPreview(data.receiptUrl, data.receiptDate, data.receiptUploader);
                     } else {
                         hideReceiptPreview();
+                    }
+                    // Real-time session sync - load current session from other team members
+                    if (data.currentSession && !isReceivingUpdate) {
+                        loadSessionFromFirebase(data.currentSession);
                     }
                     updateSyncStatus('synced');
                 }
@@ -2058,6 +2073,97 @@
             } catch (e) {
                 console.error('Error saving history to Firebase:', e);
             }
+        }
+
+        // Sync current session to Firebase (real-time collaboration)
+        let syncTimeout = null;
+        async function syncSessionToFirebase() {
+            if (!currentTeamCode || isReceivingUpdate) return;
+
+            // Debounce: wait 300ms before syncing to avoid too many writes
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(async () => {
+                try {
+                    // Generate session ID if not exists (based on today's date)
+                    if (!currentSessionId) {
+                        currentSessionId = new Date().toISOString().split('T')[0] + '_' + Date.now();
+                    }
+
+                    const billOptions = {
+                        hasService: document.getElementById('hasService').checked,
+                        serviceRate: parseFloat(document.getElementById('serviceRate').value) || 10,
+                        hasGST: document.getElementById('hasGST').checked,
+                        gstRate: parseFloat(document.getElementById('gstRate').value) || 9,
+                        discountValue: parseFloat(document.getElementById('discountValue').value) || 0,
+                        discountType: document.getElementById('discountType').value,
+                        roundingType: document.getElementById('roundingType').value,
+                        expectedTotal: parseFloat(document.getElementById('expectedTotal').value) || 0
+                    };
+
+                    await db.collection('teams').doc(currentTeamCode).update({
+                        currentSession: {
+                            sessionId: currentSessionId,
+                            people: people,
+                            items: items,
+                            paidStatus: paidStatus,
+                            billOptions: billOptions,
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        }
+                    });
+                    console.log('Session synced to Firebase');
+                } catch (e) {
+                    console.error('Error syncing session to Firebase:', e);
+                }
+            }, 300);
+        }
+
+        // Load session from Firebase data
+        function loadSessionFromFirebase(sessionData) {
+            if (!sessionData) return;
+
+            isReceivingUpdate = true;
+
+            // Update session ID
+            currentSessionId = sessionData.sessionId || null;
+
+            // Update people
+            if (sessionData.people) {
+                people = sessionData.people;
+                renderPeople();
+                renderSavedTeam();
+            }
+
+            // Update items
+            if (sessionData.items) {
+                items = sessionData.items;
+                itemIdCounter = Math.max(...items.map(i => i.id), 0) + 1;
+                renderItems();
+            }
+
+            // Update paid status
+            if (sessionData.paidStatus) {
+                paidStatus = sessionData.paidStatus;
+            }
+
+            // Update bill options
+            if (sessionData.billOptions) {
+                const opts = sessionData.billOptions;
+                document.getElementById('hasService').checked = opts.hasService || false;
+                document.getElementById('serviceRate').value = opts.serviceRate || 10;
+                document.getElementById('hasGST').checked = opts.hasGST !== false;
+                document.getElementById('gstRate').value = opts.gstRate || 9;
+                document.getElementById('discountValue').value = opts.discountValue || '';
+                document.getElementById('discountType').value = opts.discountType || 'amount';
+                document.getElementById('roundingType').value = opts.roundingType || 'none';
+                if (opts.expectedTotal > 0) {
+                    document.getElementById('expectedTotal').value = opts.expectedTotal;
+                }
+            }
+
+            calculate();
+
+            // Reset flag after a short delay
+            setTimeout(() => { isReceivingUpdate = false; }, 100);
         }
 
         // Load saved team from localStorage
@@ -2156,6 +2262,7 @@
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast('All items split equally!');
         }
 
@@ -2173,6 +2280,7 @@
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast('Cleared! Now assign each item to its owner');
         }
 
@@ -2184,7 +2292,45 @@
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast('All assignments cleared');
+        }
+
+        // Start a new session (fresh bill)
+        function startNewSession() {
+            if (items.length > 0 || people.length > 0) {
+                if (!confirm('Start a new session? Current data will be cleared.\n\nTip: Save to history first if you want to keep it.')) {
+                    return;
+                }
+            }
+
+            // Reset session
+            currentSessionId = new Date().toISOString().split('T')[0] + '_' + Date.now();
+            currentReceiptUrl = null;
+            people = [];
+            items = [];
+            itemIdCounter = 0;
+            paidStatus = {};
+
+            // Reset bill options to defaults
+            document.getElementById('hasService').checked = false;
+            document.getElementById('serviceRate').value = 10;
+            document.getElementById('hasGST').checked = true;
+            document.getElementById('gstRate').value = 9;
+            document.getElementById('discountValue').value = '';
+            document.getElementById('discountType').value = 'amount';
+            document.getElementById('roundingType').value = 'none';
+            document.getElementById('expectedTotal').value = '';
+
+            // Add one empty item
+            addItem();
+
+            renderPeople();
+            renderSavedTeam();
+            calculate();
+            syncSessionToFirebase(); // Sync new session to team
+            hideReceiptPreview();
+            showToast('New session started');
         }
 
         // Select all team members
@@ -2203,6 +2349,7 @@
             renderItems();
             renderSavedTeam();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
 
         // Deselect all team members
@@ -2213,6 +2360,7 @@
             renderItems();
             renderSavedTeam();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
 
         // Tab switching
@@ -2246,11 +2394,12 @@
                 renderItems();
                 renderSavedTeam();
                 calculate();
+                syncSessionToFirebase(); // Real-time sync
             }
 
             document.getElementById('newPersonName').value = '';
         }
-        
+
         function removePerson(name) {
             people = people.filter(p => p !== name);
             // Remove from all items
@@ -2260,6 +2409,7 @@
             renderPeople();
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
         
         function renderPeople() {
@@ -2280,22 +2430,25 @@
                 people: [...people] // Default: everyone shares
             });
             renderItems();
+            syncSessionToFirebase(); // Real-time sync
         }
-        
+
         function removeItem(id) {
             items = items.filter(i => i.id !== id);
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
         }
-        
+
         function updateItem(id, field, value) {
             const item = items.find(i => i.id === id);
             if (item) {
                 item[field] = field === 'price' ? (parseFloat(value) || 0) : value;
                 calculate();
+                syncSessionToFirebase(); // Real-time sync
             }
         }
-        
+
         function togglePerson(itemId, person) {
             const item = items.find(i => i.id === itemId);
             if (item) {
@@ -2306,6 +2459,7 @@
                 }
                 renderItems();
                 calculate();
+                syncSessionToFirebase(); // Real-time sync
             }
         }
         
@@ -2550,6 +2704,7 @@
         function togglePaid(name) {
             paidStatus[name] = !paidStatus[name];
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             showToast(paidStatus[name] ? `${name} marked as paid` : `${name} marked as unpaid`);
         }
         
@@ -2835,7 +2990,7 @@
 
         // ==================== HISTORY ====================
 
-        // Save current split to history
+        // Save current split to history (one receipt = one history entry)
         function saveToHistory() {
             const today = new Date();
             const personData = getPersonData();
@@ -2843,6 +2998,8 @@
 
             const entry = {
                 id: Date.now(),
+                sessionId: currentSessionId, // Link to current session
+                receiptUrl: currentReceiptUrl, // Link to receipt if any
                 date: today.toISOString(),
                 people: [...people],
                 items: items.map(it => ({ name: it.name, price: it.price, people: it.people })),
@@ -2850,11 +3007,30 @@
                 breakdown: personData
             };
 
-            splitHistory.unshift(entry);
-            if (splitHistory.length > 50) splitHistory.pop(); // Keep last 50
+            // Check if there's an existing entry for this session (one receipt = one history)
+            let existingIndex = -1;
+            if (currentSessionId) {
+                existingIndex = splitHistory.findIndex(h => h.sessionId === currentSessionId);
+            }
+            // Also check by receipt URL if no session match
+            if (existingIndex === -1 && currentReceiptUrl) {
+                existingIndex = splitHistory.findIndex(h => h.receiptUrl === currentReceiptUrl);
+            }
+
+            if (existingIndex !== -1) {
+                // Update existing entry instead of creating new
+                entry.id = splitHistory[existingIndex].id; // Keep original ID
+                splitHistory[existingIndex] = entry;
+                showToast('Updated existing history entry');
+            } else {
+                // Create new entry
+                splitHistory.unshift(entry);
+                if (splitHistory.length > 50) splitHistory.pop(); // Keep last 50
+                showToast('Saved to history');
+            }
+
             saveHistoryToStorage();
             renderHistory();
-            showToast('Saved to history');
         }
 
         // Render history list
@@ -2887,6 +3063,10 @@
             const entry = splitHistory.find(e => e.id === id);
             if (!entry) return;
 
+            // Set session ID so future saves update this entry
+            currentSessionId = entry.sessionId || null;
+            currentReceiptUrl = entry.receiptUrl || null;
+
             people = [...entry.people];
             items = entry.items.map((it, idx) => ({
                 id: idx,
@@ -2900,6 +3080,7 @@
             renderItems();
             renderSavedTeam();
             calculate();
+            syncSessionToFirebase(); // Sync loaded session to team
             switchTab('split');
             showToast('Loaded from history');
         }
@@ -3207,6 +3388,7 @@
 
             renderItems();
             calculate();
+            syncSessionToFirebase(); // Real-time sync
             closePreview();
             showToast(`Added ${selected.length} items`);
         }
