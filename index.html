@@ -1629,6 +1629,76 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.8); }
         }
+
+        /* Sub-tabs Navigation */
+        .sub-tab-nav {
+            display: flex;
+            gap: 4px;
+            background: #f1f3f4;
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .sub-tab-btn {
+            flex: 1;
+            padding: 10px 8px;
+            border: none;
+            background: transparent;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .sub-tab-btn .tab-icon {
+            font-size: 18px;
+        }
+
+        .sub-tab-btn .tab-label {
+            font-size: 11px;
+        }
+
+        .sub-tab-btn:hover {
+            color: #7B2D8E;
+            background: rgba(123, 45, 142, 0.1);
+        }
+
+        .sub-tab-btn.active {
+            background: white;
+            color: #7B2D8E;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .sub-tab-content {
+            display: none;
+        }
+
+        .sub-tab-content.active {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Badge for sub-tabs */
+        .sub-tab-badge {
+            background: #7B2D8E;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 4px;
+        }
     </style>
 </head>
 <body>
@@ -1654,6 +1724,25 @@
 
         <!-- Split Bill Tab -->
         <div class="tab-content active" id="tab-split">
+
+        <!-- Sub-tab Navigation -->
+        <div class="sub-tab-nav">
+            <button class="sub-tab-btn active" onclick="switchSubTab('people')">
+                <span class="tab-icon">👥</span>
+                <span class="tab-label">People</span>
+            </button>
+            <button class="sub-tab-btn" onclick="switchSubTab('items')">
+                <span class="tab-icon">🍽️</span>
+                <span class="tab-label">Items</span>
+            </button>
+            <button class="sub-tab-btn" onclick="switchSubTab('summary')">
+                <span class="tab-icon">💰</span>
+                <span class="tab-label">Summary</span>
+            </button>
+        </div>
+
+        <!-- Sub-tab: People -->
+        <div class="sub-tab-content active" id="subtab-people">
 
         <!-- Team Code -->
         <div class="card">
@@ -1692,7 +1781,12 @@
                 <button class="add-btn" onclick="addPerson()">+ Add</button>
             </div>
         </div>
-        
+
+        </div><!-- End Sub-tab: People -->
+
+        <!-- Sub-tab: Items -->
+        <div class="sub-tab-content" id="subtab-items">
+
         <!-- Items -->
         <div class="card">
             <div class="card-title"><span class="icon">🍽️</span> What's Ordered?</div>
@@ -1762,7 +1856,12 @@
             <div id="itemsList"></div>
             <button class="add-item-btn" onclick="addItem()">+ Add Item</button>
         </div>
-        
+
+        </div><!-- End Sub-tab: Items -->
+
+        <!-- Sub-tab: Summary -->
+        <div class="sub-tab-content" id="subtab-summary">
+
         <!-- Options -->
         <div class="card">
             <div class="card-title"><span class="icon">⚙️</span> Bill Options</div>
@@ -1878,6 +1977,8 @@
                 <button class="share-btn save-history" onclick="saveToHistory()">💾 Save</button>
             </div>
         </div>
+
+        </div><!-- End Sub-tab: Summary -->
 
         </div><!-- End Split Tab -->
 
@@ -2807,6 +2908,14 @@
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
             document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        // Sub-tab switching within Split Bill
+        function switchSubTab(subtab) {
+            document.querySelectorAll('.sub-tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.sub-tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelector(`[onclick="switchSubTab('${subtab}')"]`).classList.add('active');
+            document.getElementById(`subtab-${subtab}`).classList.add('active');
         }
 
         // Show toast notification
