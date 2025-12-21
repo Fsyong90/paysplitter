@@ -427,6 +427,45 @@
             align-items: center;
         }
 
+        .summary-row.difference-row {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .summary-row.difference-row.show {
+            display: flex;
+        }
+
+        .summary-row.difference-row.match {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .summary-row.difference-row.over {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .summary-row.difference-row.under {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .difference-amount {
+            font-weight: 700;
+        }
+
+        .difference-hint {
+            font-size: 11px;
+            font-weight: 400;
+            opacity: 0.8;
+            margin-left: 8px;
+        }
+
         .expected-input-wrap {
             display: flex;
             align-items: center;
@@ -1962,6 +2001,10 @@
                         <input type="number" class="expected-input" id="expectedTotal" placeholder="0.00" step="0.01" oninput="checkTotalMatch(); syncSessionToFirebase();">
                     </div>
                 </div>
+                <div class="summary-row difference-row" id="differenceRow">
+                    <span id="differenceLabel">Difference</span>
+                    <span class="difference-amount" id="differenceAmount">S$ 0.00</span>
+                </div>
                 <div class="total-match" id="totalMatch"></div>
             </div>
             
@@ -3124,11 +3167,15 @@
         function checkTotalMatch(calculatedTotal) {
             const expectedInput = document.getElementById('expectedTotal');
             const matchDiv = document.getElementById('totalMatch');
+            const differenceRow = document.getElementById('differenceRow');
+            const differenceLabel = document.getElementById('differenceLabel');
+            const differenceAmount = document.getElementById('differenceAmount');
             const expected = parseFloat(expectedInput.value) || 0;
 
             if (expected <= 0) {
                 matchDiv.className = 'total-match';
                 matchDiv.innerHTML = '';
+                differenceRow.className = 'summary-row difference-row';
                 return false;
             }
 
@@ -3138,9 +3185,16 @@
                 calculatedTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
             }
 
-            const diff = Math.abs(calculatedTotal - expected);
+            const diff = calculatedTotal - expected;
+            const absDiff = Math.abs(diff);
 
-            if (diff < 0.05) {
+            // Update difference row display
+            if (absDiff < 0.05) {
+                // Match - amounts are equal
+                differenceRow.className = 'summary-row difference-row show match';
+                differenceLabel.textContent = 'Difference';
+                differenceAmount.innerHTML = '✅ S$ 0.00';
+
                 matchDiv.className = 'total-match match';
                 matchDiv.innerHTML = `
                     <span class="match-icon">✅</span>
@@ -3148,13 +3202,30 @@
                     <div class="match-hint">Safe to share with your team</div>
                 `;
                 return true;
-            } else {
+            } else if (diff > 0) {
+                // Over - calculated is higher than receipt
+                differenceRow.className = 'summary-row difference-row show over';
+                differenceLabel.textContent = 'Over by';
+                differenceAmount.innerHTML = `+S$ ${absDiff.toFixed(2)}`;
+
                 matchDiv.className = 'total-match mismatch';
-                const diffSign = calculatedTotal > expected ? '+' : '-';
                 matchDiv.innerHTML = `
                     <span class="match-icon">⚠️</span>
-                    Difference: ${diffSign}S$${diff.toFixed(2)}
-                    <div class="match-hint">Expected S$${expected.toFixed(2)} • Check items or bill options</div>
+                    You're charging S$${absDiff.toFixed(2)} more than receipt
+                    <div class="match-hint">Receipt: S$${expected.toFixed(2)} • Check items or reduce amounts</div>
+                `;
+                return false;
+            } else {
+                // Under - calculated is lower than receipt
+                differenceRow.className = 'summary-row difference-row show under';
+                differenceLabel.textContent = 'Under by';
+                differenceAmount.innerHTML = `-S$ ${absDiff.toFixed(2)}`;
+
+                matchDiv.className = 'total-match mismatch';
+                matchDiv.innerHTML = `
+                    <span class="match-icon">⚠️</span>
+                    You're missing S$${absDiff.toFixed(2)} from receipt
+                    <div class="match-hint">Receipt: S$${expected.toFixed(2)} • Check for missing items</div>
                 `;
                 return false;
             }
