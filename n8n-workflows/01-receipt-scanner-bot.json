@@ -1,0 +1,436 @@
+{
+  "name": "PaySplitter - Receipt Scanner Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "paysplitter-bot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle Seatalk webhook events\nconst input = $input.first().json;\nconst eventType = input.event_type || '';\n\n// Verification response\nif (eventType === 'event_verification') {\n  return [{\n    json: {\n      _action: 'respond',\n      _response: { seatalk_challenge: input.seatalk_challenge }\n    }\n  }];\n}\n\n// Handle DM with image\nif (eventType === 'message_from_bot_subscriber') {\n  const event = input.event || {};\n  const sender = event.sender || {};\n  const message = event.message || {};\n  \n  // Check if image message\n  if (message.tag === 'image' && message.image) {\n    return [{\n      json: {\n        _action: 'process_image',\n        image_key: message.image.image_key || '',\n        image_content: message.image.content || '',\n        employee_code: sender.employee_code,\n        sender_name: sender.name || 'Unknown',\n        delivery_method: 'direct_message',\n        group_id: null\n      }\n    }];\n  }\n  \n  // Text message - show help\n  return [{\n    json: {\n      _action: 'send_help',\n      employee_code: sender.employee_code,\n      delivery_method: 'direct_message',\n      group_id: null\n    }\n  }];\n}\n\n// Handle group mention with image\nif (eventType === 'new_mentioned_message_received_from_group_chat') {\n  const event = input.event || {};\n  const message = event.message || {};\n  const sender = message.sender || event.sender || {};\n  const group = event.group || {};\n  \n  // Check if image message\n  if (message.tag === 'image' && message.image) {\n    return [{\n      json: {\n        _action: 'process_image',\n        image_key: message.image.image_key || '',\n        image_content: message.image.content || '',\n        employee_code: sender.employee_code,\n        sender_name: sender.name || 'Unknown',\n        delivery_method: 'group_chat',\n        group_id: group.group_id || event.group_id\n      }\n    }];\n  }\n  \n  // Text mention - show help\n  return [{\n    json: {\n      _action: 'send_help',\n      employee_code: sender.employee_code,\n      delivery_method: 'group_chat',\n      group_id: group.group_id || event.group_id\n    }\n  }];\n}\n\n// Unknown event - acknowledge\nreturn [{\n  json: {\n    _action: 'respond',\n    _response: { status: 'ok' }\n  }\n}];"
+      },
+      "id": "process-event",
+      "name": "Process Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._action }}",
+              "rightValue": "respond",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-respond",
+      "name": "Quick Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json._response) }}",
+        "options": {}
+      },
+      "id": "respond-now",
+      "name": "Respond Now",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._action }}",
+              "rightValue": "process_image",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-image",
+      "name": "Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"processing\" }",
+        "options": {}
+      },
+      "id": "respond-processing",
+      "name": "Respond Processing",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ai.insea.io/api/workflows/10902/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "specifyBody": "formData",
+        "formParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "receipt_image",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "scan-receipt",
+      "name": "Scan Receipt (AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "alpha-api-paysplitter",
+          "name": "Alpha API PaySplitter"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and generate paysplitter URL\nconst response = $json;\nconst eventData = $('Process Event').first().json;\n\n// Extract data from AI response\nconst outputs = response.data?.outputs || {};\nconst splitResult = outputs.split_result || '';\n\n// Parse items from AI result\nlet items = [];\ntry {\n  // Try JSON array format\n  let data = typeof splitResult === 'string' ? JSON.parse(splitResult) : splitResult;\n  if (Array.isArray(data)) {\n    items = data.filter(item => item.name && item.price > 0).map(item => ({\n      n: item.name,\n      pr: parseFloat(item.price),\n      ppl: []  // Empty - user will assign\n    }));\n  }\n} catch (e) {\n  // Fallback: parse text format\n  const lines = splitResult.split('\\n');\n  for (const line of lines) {\n    const match = line.match(/^\\d+\\.\\s*(.+?)\\s*-\\s*\\$?([\\d.]+)/);\n    if (match) {\n      const name = match[1].trim();\n      const price = parseFloat(match[2]);\n      if (price > 0 && price < 200) {\n        items.push({ n: name, pr: price, ppl: [] });\n      }\n    }\n  }\n}\n\nif (items.length === 0) {\n  return [{\n    json: {\n      ...eventData,\n      _success: false,\n      _message: \"Sorry, I couldn't read any items from that receipt. Please try a clearer photo.\"\n    }\n  }];\n}\n\n// Build paysplitter data\nconst paysplitterData = {\n  p: [],  // Empty people - user will add\n  i: items,\n  svc: outputs.service_charge > 0 ? 10 : 0,  // Default 10% if detected\n  gst: 9,  // Singapore GST\n  disc: outputs.discount || 0,\n  discType: 'amount'\n};\n\n// Encode for URL\nconst encoded = Buffer.from(encodeURIComponent(JSON.stringify(paysplitterData))).toString('base64');\n\n// Build chat_id for callback\nconst chatId = eventData.delivery_method === 'group_chat' \n  ? `group:${eventData.group_id}` \n  : `dm:${eventData.employee_code}`;\n\nconst url = `https://fsyong90.github.io/paysplitter/?d=${encoded}&chat_id=${encodeURIComponent(chatId)}`;\n\n// Build summary message\nlet summary = '**Receipt Scanned!**\\n\\n';\nsummary += 'Items found:\\n';\nitems.forEach(item => {\n  summary += `- ${item.n} - $${item.pr.toFixed(2)}\\n`;\n});\n\nconst subtotal = items.reduce((sum, item) => sum + item.pr, 0);\nsummary += `\\n**Subtotal:** $${subtotal.toFixed(2)}`;\n\nif (outputs.service_charge > 0) {\n  summary += `\\nService: $${outputs.service_charge.toFixed(2)}`;\n}\nif (outputs.gst > 0) {\n  summary += `\\nGST: $${outputs.gst.toFixed(2)}`;\n}\nif (outputs.grand_total > 0) {\n  summary += `\\n**Total:** $${outputs.grand_total.toFixed(2)}`;\n}\n\nsummary += `\\n\\nAssign & split here:\\n${url}`;\n\nreturn [{\n  json: {\n    ...eventData,\n    _success: true,\n    _message: summary,\n    _url: url,\n    _item_count: items.length,\n    _subtotal: subtotal\n  }\n}];"
+      },
+      "id": "parse-result",
+      "name": "Parse AI Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/auth/app_access_token",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"app_id\": \"NzAyNDM5Nzg5MjMy\", \"app_secret\": \"XzKSWyeoeRnzt9ZjIo2twcp18dPo6gzN\"}",
+        "options": {}
+      },
+      "id": "get-token",
+      "name": "Get Seatalk Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare to send response\nconst parseData = $('Parse AI Result').first().json;\nconst token = $json.app_access_token;\n\nreturn [{\n  json: {\n    access_token: token,\n    message: parseData._message,\n    employee_code: parseData.employee_code,\n    group_id: parseData.group_id,\n    delivery_method: parseData.delivery_method\n  }\n}];"
+      },
+      "id": "prepare-send",
+      "name": "Prepare Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.delivery_method }}",
+              "rightValue": "group_chat",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-group",
+      "name": "Is Group?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1980, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/group_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ group_id: $json.group_id, message: { tag: 'text', text: { format: 1, content: $json.message } } }) }}",
+        "options": {}
+      },
+      "id": "send-group",
+      "name": "Send to Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/single_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ employee_code: $json.employee_code, message: { tag: 'text', text: { format: 1, content: $json.message } }, usable_platform: 'all' }) }}",
+        "options": {}
+      },
+      "id": "send-dm",
+      "name": "Send DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Help message for text (non-image) messages\nconst eventData = $input.first().json;\n\nconst helpMessage = `**PaySplitter Bot**\n\nSend me a receipt photo and I'll scan it for you!\n\nI'll extract the items and generate a link to split the bill with your team.`;\n\nreturn [{\n  json: {\n    ...eventData,\n    _message: helpMessage\n  }\n}];"
+      },
+      "id": "help-message",
+      "name": "Help Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/auth/app_access_token",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"app_id\": \"NzAyNDM5Nzg5MjMy\", \"app_secret\": \"XzKSWyeoeRnzt9ZjIo2twcp18dPo6gzN\"}",
+        "options": {}
+      },
+      "id": "get-token-help",
+      "name": "Get Token (Help)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare help response\nconst helpData = $('Help Message').first().json;\nconst token = $json.app_access_token;\n\nreturn [{\n  json: {\n    access_token: token,\n    message: helpData._message,\n    employee_code: helpData.employee_code,\n    group_id: helpData.group_id,\n    delivery_method: helpData.delivery_method\n  }\n}];"
+      },
+      "id": "prepare-help-send",
+      "name": "Prepare Help Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.delivery_method }}",
+              "rightValue": "group_chat",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-group-help",
+      "name": "Is Group? (Help)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1540, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/group_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ group_id: $json.group_id, message: { tag: 'text', text: { format: 1, content: $json.message } } }) }}",
+        "options": {}
+      },
+      "id": "send-group-help",
+      "name": "Send Help to Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/single_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ employee_code: $json.employee_code, message: { tag: 'text', text: { format: 1, content: $json.message } }, usable_platform: 'all' }) }}",
+        "options": {}
+      },
+      "id": "send-dm-help",
+      "name": "Send Help DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\" }",
+        "options": {}
+      },
+      "id": "respond-help-ok",
+      "name": "Respond Help OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 500]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Process Event", "type": "main", "index": 0 }]]
+    },
+    "Process Event": {
+      "main": [[{ "node": "Quick Response?", "type": "main", "index": 0 }]]
+    },
+    "Quick Response?": {
+      "main": [
+        [{ "node": "Respond Now", "type": "main", "index": 0 }],
+        [{ "node": "Has Image?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Image?": {
+      "main": [
+        [{ "node": "Respond Processing", "type": "main", "index": 0 }],
+        [{ "node": "Help Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Respond Processing": {
+      "main": [[{ "node": "Scan Receipt (AI)", "type": "main", "index": 0 }]]
+    },
+    "Scan Receipt (AI)": {
+      "main": [[{ "node": "Parse AI Result", "type": "main", "index": 0 }]]
+    },
+    "Parse AI Result": {
+      "main": [[{ "node": "Get Seatalk Token", "type": "main", "index": 0 }]]
+    },
+    "Get Seatalk Token": {
+      "main": [[{ "node": "Prepare Send", "type": "main", "index": 0 }]]
+    },
+    "Prepare Send": {
+      "main": [[{ "node": "Is Group?", "type": "main", "index": 0 }]]
+    },
+    "Is Group?": {
+      "main": [
+        [{ "node": "Send to Group", "type": "main", "index": 0 }],
+        [{ "node": "Send DM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Help Message": {
+      "main": [[{ "node": "Get Token (Help)", "type": "main", "index": 0 }]]
+    },
+    "Get Token (Help)": {
+      "main": [[{ "node": "Prepare Help Send", "type": "main", "index": 0 }]]
+    },
+    "Prepare Help Send": {
+      "main": [[{ "node": "Is Group? (Help)", "type": "main", "index": 0 }]]
+    },
+    "Is Group? (Help)": {
+      "main": [
+        [{ "node": "Send Help to Group", "type": "main", "index": 0 }],
+        [{ "node": "Send Help DM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Help to Group": {
+      "main": [[{ "node": "Respond Help OK", "type": "main", "index": 0 }]]
+    },
+    "Send Help DM": {
+      "main": [[{ "node": "Respond Help OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "pinData": {},
+  "id": "paysplitter-receipt-scanner",
+  "active": false,
+  "meta": {"instanceId": "local"}
+}

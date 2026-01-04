@@ -1,0 +1,332 @@
+{
+  "name": "PaySplitter - Post Results to Seatalk",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "paysplitter-results",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Receive Results",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse incoming data and prepare for sending\nconst input = $input.first().json;\n\nconst chatId = input.chat_id || '';\nconst breakdown = input.breakdown || [];\nconst paynowNumber = input.paynow_number || '+6583399525';\nconst date = input.date || new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });\nconst total = input.total || 0;\n\n// Parse chat_id to determine delivery method\n// Format: \"group:GROUP_ID\" or \"dm:EMPLOYEE_CODE\"\nlet deliveryMethod = 'direct_message';\nlet groupId = null;\nlet employeeCode = null;\n\nif (chatId.startsWith('group:')) {\n  deliveryMethod = 'group_chat';\n  groupId = chatId.replace('group:', '');\n} else if (chatId.startsWith('dm:')) {\n  employeeCode = chatId.replace('dm:', '');\n} else {\n  // Fallback: assume it's an employee code\n  employeeCode = chatId;\n}\n\n// Prepare output items - one per person\nconst outputs = breakdown.map((person, idx) => ({\n  json: {\n    person_name: person.name,\n    amount: person.amount,\n    items: person.items || [],\n    paynow_number: paynowNumber,\n    date: date,\n    delivery_method: deliveryMethod,\n    group_id: groupId,\n    employee_code: employeeCode,\n    is_last: idx === breakdown.length - 1,\n    total: total,\n    person_count: breakdown.length\n  }\n}));\n\nreturn outputs;"
+      },
+      "id": "parse-input",
+      "name": "Parse Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/auth/app_access_token",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"app_id\": \"NzAyNDM5Nzg5MjMy\", \"app_secret\": \"XzKSWyeoeRnzt9ZjIo2twcp18dPo6gzN\"}",
+        "options": {}
+      },
+      "id": "get-token",
+      "name": "Get Seatalk Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate PayNow QR string for this person\nconst personData = $('Parse Input').item.json;\nconst token = $json.app_access_token;\n\nconst amount = personData.amount;\nconst paynowNumber = personData.paynow_number;\nconst personName = personData.person_name;\nconst date = personData.date;\n\n// TLV encoding function\nfunction tlv(tag, value) {\n  return tag + value.length.toString().padStart(2, '0') + value;\n}\n\n// CRC-16/CCITT calculation\nfunction calculateCRC(str) {\n  let crc = 0xFFFF;\n  for (let i = 0; i < str.length; i++) {\n    crc ^= str.charCodeAt(i) << 8;\n    for (let j = 0; j < 8; j++) {\n      crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;\n    }\n  }\n  return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');\n}\n\n// Build PayNow QR string\nlet merchantAcctInfo = '';\nmerchantAcctInfo += tlv('00', 'SG.PAYNOW');\nmerchantAcctInfo += tlv('01', '0'); // Proxy type: mobile\nmerchantAcctInfo += tlv('02', paynowNumber);\nmerchantAcctInfo += tlv('03', '1'); // Editable\n\nlet payload = '';\npayload += tlv('00', '01');\npayload += tlv('01', '12');\npayload += tlv('26', merchantAcctInfo);\npayload += tlv('52', '0000');\npayload += tlv('53', '702'); // SGD\npayload += tlv('54', amount.toFixed(2));\npayload += tlv('58', 'SG');\npayload += tlv('59', 'NA');\npayload += tlv('60', 'Singapore');\n\nconst reference = `${personName} ${date}`.substring(0, 25);\npayload += tlv('62', tlv('01', reference));\n\npayload += '6304';\npayload += calculateCRC(payload);\n\n// Generate QR code URL using quickchart.io\nconst qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(payload)}&size=200&margin=1`;\n\n// Build message text\nlet message = `**${personName}** owes **S$${amount.toFixed(2)}**\\n\\n`;\nif (personData.items && personData.items.length > 0) {\n  message += `Items: ${personData.items.join(', ')}\\n\\n`;\n}\nmessage += `PayNow to ${paynowNumber.replace(/(\\+65)(\\d{4})(\\d{4})/, '$1 $2 $3')}`;\n\nreturn [{\n  json: {\n    ...personData,\n    access_token: token,\n    message: message,\n    qr_url: qrUrl,\n    paynow_string: payload\n  }\n}];"
+      },
+      "id": "generate-qr",
+      "name": "Generate QR & Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.qr_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-qr",
+      "name": "Download QR Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert QR image to base64 for Seatalk\nconst prevData = $('Generate QR & Message').item.json;\nconst binaryData = $input.first().binary;\n\nlet imageBase64 = '';\nif (binaryData && binaryData.data) {\n  imageBase64 = binaryData.data.data; // Already base64\n}\n\nreturn [{\n  json: {\n    ...prevData,\n    image_base64: imageBase64\n  }\n}];"
+      },
+      "id": "prepare-image",
+      "name": "Prepare Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.delivery_method }}",
+              "rightValue": "group_chat",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-group",
+      "name": "Is Group?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/group_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ group_id: $json.group_id, message: { tag: 'text', text: { format: 1, content: $json.message } } }) }}",
+        "options": {}
+      },
+      "id": "send-group-text",
+      "name": "Send Text to Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/single_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ employee_code: $json.employee_code, message: { tag: 'text', text: { format: 1, content: $json.message } }, usable_platform: 'all' }) }}",
+        "options": {}
+      },
+      "id": "send-dm-text",
+      "name": "Send Text DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare to send QR image if we have it\nconst prevData = $('Prepare Image').item.json;\nconst sendResult = $json;\n\nreturn [{\n  json: {\n    ...prevData,\n    text_sent: sendResult.code === 0\n  }\n}];"
+      },
+      "id": "after-text",
+      "name": "After Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.image_base64 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-image",
+      "name": "Has QR Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1980, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.delivery_method }}",
+              "rightValue": "group_chat",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-group-img",
+      "name": "Is Group? (Img)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2200, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/group_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ group_id: $json.group_id, message: { tag: 'image', image: { content: $json.image_base64 } } }) }}",
+        "options": {}
+      },
+      "id": "send-group-img",
+      "name": "Send QR to Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.seatalk.io/messaging/v2/single_chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ employee_code: $json.employee_code, message: { tag: 'image', image: { content: $json.image_base64 } }, usable_platform: 'all' }) }}",
+        "options": {}
+      },
+      "id": "send-dm-img",
+      "name": "Send QR DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wait a bit between messages to avoid rate limiting\nconst prevData = $input.first().json;\n\n// Add 500ms delay\nawait new Promise(resolve => setTimeout(resolve, 500));\n\nreturn [{ json: { status: 'sent', person: prevData.person_name } }];"
+      },
+      "id": "delay",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 200]
+    }
+  ],
+  "connections": {
+    "Receive Results": {
+      "main": [[{ "node": "Parse Input", "type": "main", "index": 0 }]]
+    },
+    "Parse Input": {
+      "main": [[{ "node": "Get Seatalk Token", "type": "main", "index": 0 }]]
+    },
+    "Get Seatalk Token": {
+      "main": [[{ "node": "Generate QR & Message", "type": "main", "index": 0 }]]
+    },
+    "Generate QR & Message": {
+      "main": [[{ "node": "Download QR Image", "type": "main", "index": 0 }]]
+    },
+    "Download QR Image": {
+      "main": [[{ "node": "Prepare Image", "type": "main", "index": 0 }]]
+    },
+    "Prepare Image": {
+      "main": [[{ "node": "Is Group?", "type": "main", "index": 0 }]]
+    },
+    "Is Group?": {
+      "main": [
+        [{ "node": "Send Text to Group", "type": "main", "index": 0 }],
+        [{ "node": "Send Text DM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Text to Group": {
+      "main": [[{ "node": "After Text", "type": "main", "index": 0 }]]
+    },
+    "Send Text DM": {
+      "main": [[{ "node": "After Text", "type": "main", "index": 0 }]]
+    },
+    "After Text": {
+      "main": [[{ "node": "Has QR Image?", "type": "main", "index": 0 }]]
+    },
+    "Has QR Image?": {
+      "main": [
+        [{ "node": "Is Group? (Img)", "type": "main", "index": 0 }],
+        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Group? (Img)": {
+      "main": [
+        [{ "node": "Send QR to Group", "type": "main", "index": 0 }],
+        [{ "node": "Send QR DM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send QR to Group": {
+      "main": [[{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]]
+    },
+    "Send QR DM": {
+      "main": [[{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "pinData": {},
+  "id": "paysplitter-post-results",
+  "active": false,
+  "meta": {"instanceId": "local"}
+}

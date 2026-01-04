@@ -2016,6 +2016,7 @@
             <!-- Share Actions -->
             <div class="share-actions" id="shareActions" style="display: none;">
                 <button class="share-btn whatsapp" onclick="shareWhatsApp()">📱 WhatsApp</button>
+                <button class="share-btn seatalk" id="seatalkBtn" onclick="sendToSeatalk()" style="display: none; background: linear-gradient(135deg, #00a9e0, #0077b5);">💬 Seatalk</button>
                 <button class="share-btn copy-link" onclick="copyShareLink()">🔗 Copy Link</button>
                 <button class="share-btn save-history" onclick="saveToHistory()">💾 Save</button>
             </div>
@@ -2158,6 +2159,10 @@
 
         // Current session ID (for one-receipt-one-history feature)
         let currentSessionId = null;
+
+        // Seatalk integration - chat ID from URL for sending results back
+        let seatalkChatId = null;
+        const N8N_SEATALK_WEBHOOK_URL = 'https://shortly-curious-donkey.ngrok-free.app/webhook/paysplitter-results';
 
         // Undo/Redo stacks
         let undoStack = [];
@@ -3662,10 +3667,87 @@
             });
         }
 
+        // Send final breakdown to Seatalk via n8n webhook
+        async function sendToSeatalk() {
+            if (!seatalkChatId) {
+                showToast('No Seatalk chat linked');
+                return;
+            }
+
+            if (!isTotalMatched()) {
+                if (!confirm('⚠️ Total doesn\'t match receipt!\n\nAre you sure you want to send to Seatalk anyway?')) {
+                    return;
+                }
+            }
+
+            const personData = getPersonData();
+            if (personData.length === 0 || personData.every(p => p.total === 0)) {
+                showToast('No breakdown to send!');
+                return;
+            }
+
+            const btn = document.getElementById('seatalkBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Sending...';
+            btn.disabled = true;
+
+            try {
+                const today = new Date();
+                const dateStr = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+                const payload = {
+                    chat_id: seatalkChatId,
+                    breakdown: personData.map(p => ({
+                        name: p.name,
+                        amount: p.total,
+                        items: p.items ? p.items.map(i => i.name) : []
+                    })),
+                    paynow_number: getPayNowNumber(),
+                    date: dateStr,
+                    total: personData.reduce((sum, p) => sum + p.total, 0)
+                };
+
+                const response = await fetch(N8N_SEATALK_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    btn.innerHTML = '✅ Sent!';
+                    showToast('Sent to Seatalk! 🎉');
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error('Failed to send');
+                }
+            } catch (e) {
+                console.error('Error sending to Seatalk:', e);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                showToast('Failed to send to Seatalk');
+            }
+        }
+
         // Check URL params for shared data
         function checkUrlParams() {
             const params = new URLSearchParams(window.location.search);
             const data = params.get('d');
+            const chatId = params.get('chat_id');
+
+            // Check for Seatalk chat_id
+            if (chatId) {
+                seatalkChatId = decodeURIComponent(chatId);
+                // Show Seatalk button
+                const seatalkBtn = document.getElementById('seatalkBtn');
+                if (seatalkBtn) {
+                    seatalkBtn.style.display = 'inline-flex';
+                }
+                console.log('Seatalk chat_id detected:', seatalkChatId);
+            }
+
             if (data) {
                 try {
                     const decoded = JSON.parse(decodeURIComponent(atob(data)));
@@ -3694,9 +3776,9 @@
                     renderPeople();
                     renderItems();
                     calculate();
-                    showToast('Loaded shared bill');
+                    showToast('Loaded shared bill' + (seatalkChatId ? ' from Seatalk' : ''));
 
-                    // Clear URL params
+                    // Clear URL params (keep functionality but remove from display)
                     window.history.replaceState({}, '', window.location.pathname);
                 } catch (e) {
                     console.error('Error loading shared data:', e);
