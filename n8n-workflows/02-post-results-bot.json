@@ -9,7 +9,7 @@
         "options": {}
       },
       "id": "webhook",
-      "name": "Receive Results",
+      "name": "ReceiveResults",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 300]
