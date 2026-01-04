@@ -1911,10 +1911,10 @@
                         <span>Before GST</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="rate-input" id="serviceRate" value="10" min="0" max="100" step="0.5" oninput="calculate(); syncSessionToFirebase();">
+                        <input type="number" class="rate-input" id="serviceRate" value="10" min="0" max="100" step="0.5" oninput="calculate(); saveBillOptions(); syncSessionToFirebase();">
                         <span>%</span>
                         <label class="switch">
-                            <input type="checkbox" id="hasService" onchange="calculate(); syncSessionToFirebase();">
+                            <input type="checkbox" id="hasService" onchange="calculate(); saveBillOptions(); syncSessionToFirebase();">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -1926,8 +1926,8 @@
                         <span>Before GST</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="discount-input" id="discountValue" placeholder="0" step="0.01" oninput="calculate(); syncSessionToFirebase();">
-                        <select class="discount-type" id="discountType" onchange="calculate(); syncSessionToFirebase();">
+                        <input type="number" class="discount-input" id="discountValue" placeholder="0" step="0.01" oninput="calculate(); saveBillOptions(); syncSessionToFirebase();">
+                        <select class="discount-type" id="discountType" onchange="calculate(); saveBillOptions(); syncSessionToFirebase();">
                             <option value="amount">S$</option>
                             <option value="percent">%</option>
                         </select>
@@ -1940,10 +1940,10 @@
                         <span>After svc & discount</span>
                     </div>
                     <div class="option-controls">
-                        <input type="number" class="rate-input" id="gstRate" value="9" min="0" max="100" step="0.5" oninput="calculate(); syncSessionToFirebase();">
+                        <input type="number" class="rate-input" id="gstRate" value="9" min="0" max="100" step="0.5" oninput="calculate(); saveBillOptions(); syncSessionToFirebase();">
                         <span>%</span>
                         <label class="switch">
-                            <input type="checkbox" id="hasGST" checked onchange="calculate(); syncSessionToFirebase();">
+                            <input type="checkbox" id="hasGST" checked onchange="calculate(); saveBillOptions(); syncSessionToFirebase();">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -1955,7 +1955,7 @@
                         <span>Per person amount</span>
                     </div>
                     <div class="option-controls">
-                        <select class="rounding-select" id="roundingType" onchange="calculate(); syncSessionToFirebase();">
+                        <select class="rounding-select" id="roundingType" onchange="calculate(); saveBillOptions(); syncSessionToFirebase();">
                             <option value="none">Exact</option>
                             <option value="0.10">$0.10</option>
                             <option value="0.50">$0.50</option>
@@ -2125,6 +2125,7 @@
         const HISTORY_KEY = 'paynow_history';
         const TEAM_CODE_KEY = 'paynow_team_code';
         const PAYNOW_NUMBER_KEY = 'paynow_number';
+        const BILL_OPTIONS_KEY = 'paynow_bill_options';
 
         // Default PayNow number
         const DEFAULT_PAYNOW_NUMBER = '+6583399525';
@@ -2383,6 +2384,7 @@
             loadSavedTeam();
             loadHistory();
             loadTeamCode();
+            loadBillOptions(); // Load saved bill options (service charge, GST, etc.)
             checkUrlParams();
             if (people.length === 0) {
                 addItem();
@@ -2393,6 +2395,7 @@
             updatePayNowDisplay();
             generateCoffeeQR();
             setupKeyboardShortcuts();
+            calculate(); // Recalculate with loaded options
         }
 
         // Setup keyboard shortcuts for undo/redo
@@ -2777,6 +2780,45 @@
                 saveHistoryToFirebase(); // Sync to Firebase
             } catch (e) {
                 console.error('Error saving history:', e);
+            }
+        }
+
+        // Save bill options to localStorage
+        function saveBillOptions() {
+            try {
+                const options = {
+                    hasService: document.getElementById('hasService').checked,
+                    serviceRate: parseFloat(document.getElementById('serviceRate').value) || 10,
+                    hasGST: document.getElementById('hasGST').checked,
+                    gstRate: parseFloat(document.getElementById('gstRate').value) || 9,
+                    discountValue: parseFloat(document.getElementById('discountValue').value) || 0,
+                    discountType: document.getElementById('discountType').value,
+                    roundingType: document.getElementById('roundingType').value
+                };
+                localStorage.setItem(BILL_OPTIONS_KEY, JSON.stringify(options));
+            } catch (e) {
+                console.error('Error saving bill options:', e);
+            }
+        }
+
+        // Load bill options from localStorage
+        function loadBillOptions() {
+            try {
+                const saved = localStorage.getItem(BILL_OPTIONS_KEY);
+                if (saved) {
+                    const options = JSON.parse(saved);
+                    document.getElementById('hasService').checked = options.hasService || false;
+                    document.getElementById('serviceRate').value = options.serviceRate || 10;
+                    document.getElementById('hasGST').checked = options.hasGST !== false;
+                    document.getElementById('gstRate').value = options.gstRate || 9;
+                    if (options.discountValue > 0) {
+                        document.getElementById('discountValue').value = options.discountValue;
+                    }
+                    document.getElementById('discountType').value = options.discountType || 'amount';
+                    document.getElementById('roundingType').value = options.roundingType || 'none';
+                }
+            } catch (e) {
+                console.error('Error loading bill options:', e);
             }
         }
 
