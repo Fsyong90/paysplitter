@@ -2162,7 +2162,7 @@
 
         // Seatalk integration - chat ID from URL for sending results back
         let seatalkChatId = null;
-        const N8N_SEATALK_WEBHOOK_URL = 'https://shortly-curious-donkey.ngrok-free.app/webhook/1Qz5xE5UtQBZ3mFP/receiveresults/paysplitter-results';
+        const N8N_SEATALK_WEBHOOK_URL = 'https://shortly-curious-donkey.ngrok-free.app/webhook/zvHPJ0e13zrf4Cjx/webhook/paysplitter-results';
 
         // Undo/Redo stacks
         let undoStack = [];
@@ -2732,6 +2732,7 @@
                 if (opts.expectedTotal > 0) {
                     document.getElementById('expectedTotal').value = opts.expectedTotal;
                 }
+                saveBillOptions(); // Save synced options to localStorage
             }
 
             calculate();
