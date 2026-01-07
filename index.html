@@ -2552,7 +2552,7 @@
                         localStorage.setItem(TEAM_KEY, JSON.stringify(savedTeam));
                         renderSavedTeam();
                     }
-                    if (data.history) {
+                    if (data.history && data.history.length > 0) {
                         splitHistory = data.history;
                         localStorage.setItem(HISTORY_KEY, JSON.stringify(splitHistory));
                         renderHistory();
