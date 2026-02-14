@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Drag &amp; Drop Allocation - Prototype</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 16px;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            opacity: 0.85;
+            font-size: 13px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title .icon {
+            font-size: 18px;
+        }
+
+        /* === UNASSIGNED ITEMS POOL === */
+        .items-pool {
+            min-height: 60px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 12px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .items-pool.drag-over {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .items-pool.empty-hint::after {
+            content: 'All items assigned! 🎉';
+            color: #999;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 8px;
+        }
+
+        /* === ITEM CHIP === */
+        .item-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: grab;
+            transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+            touch-action: none;
+            white-space: nowrap;
+        }
+
+        .item-chip:active {
+            cursor: grabbing;
+        }
+
+        .item-chip.dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        .item-chip .item-price {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .item-chip .item-name {
+            color: #333;
+        }
+
+        /* Cloned drag element */
+        .item-chip.drag-clone {
+            position: fixed;
+            z-index: 9999;
+            pointer-events: none;
+            transform: scale(1.08);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+            background: white;
+            opacity: 1;
+        }
+
+        /* === PERSON DROP ZONES === */
+        .person-zones {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .person-zone {
+            border: 2px solid #e8e8e8;
+            border-radius: 14px;
+            padding: 12px;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+        }
+
+        .person-zone.drag-over {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.06);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+
+        .person-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .person-name {
+            font-weight: 700;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .person-total {
+            font-weight: 600;
+            font-size: 14px;
+            color: #667eea;
+        }
+
+        .person-items {
+            min-height: 36px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .person-items:empty::after {
+            content: 'Drop items here';
+            color: #bbb;
+            font-size: 12px;
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            padding: 4px;
+        }
+
+        .person-items .item-chip {
+            padding: 6px 10px;
+            font-size: 12px;
+            background: #eef0ff;
+        }
+
+        .person-items .item-chip .remove-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.1);
+            border: none;
+            font-size: 11px;
+            cursor: pointer;
+            color: #666;
+            margin-left: 2px;
+            transition: background 0.15s;
+        }
+
+        .person-items .item-chip .remove-btn:hover {
+            background: rgba(255,0,0,0.15);
+            color: #d00;
+        }
+
+        /* === SHARED INDICATOR === */
+        .shared-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 2px;
+        }
+
+        /* === SUMMARY === */
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .summary-row.total {
+            border-top: 2px solid #eee;
+            margin-top: 6px;
+            padding-top: 10px;
+            font-weight: 700;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .summary-row .unassigned {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        /* === ASSIGN ALL BUTTON === */
+        .assign-all-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            background: transparent;
+            color: #667eea;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .assign-all-btn:hover {
+            background: rgba(102, 126, 234, 0.08);
+        }
+
+        /* === RESET BTN === */
+        .reset-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* === INSTRUCTION BANNER === */
+        .instruction {
+            text-align: center;
+            color: rgba(255,255,255,0.85);
+            font-size: 12px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        /* === TAP MODE TOGGLE === */
+        .mode-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #e0e0e0;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: #f5f5f5;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #888;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🧾 Item Allocation</h1>
+            <p>Prototype — Drag &amp; Drop</p>
+        </div>
+
+        <div class="instruction">
+            Drag items from the pool into each person's zone.<br>
+            Items can be shared — drop the same item on multiple people.
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="card">
+            <div class="mode-toggle">
+                <button class="mode-btn active" onclick="setMode('drag')">✋ Drag &amp; Drop</button>
+                <button class="mode-btn" onclick="setMode('tap')">👆 Tap to Assign</button>
+            </div>
+            <div id="tapInstruction" style="display:none; text-align:center; font-size:12px; color:#888; margin-top:4px;">
+                Tap an item, then tap a person to assign it
+            </div>
+        </div>
+
+        <!-- Unassigned Items Pool -->
+        <div class="card">
+            <div class="card-title"><span class="icon">📦</span> Unassigned Items</div>
+            <div id="itemsPool" class="items-pool"></div>
+            <button class="assign-all-btn" onclick="assignAllEvenly()">⚡ Split all items evenly</button>
+        </div>
+
+        <!-- Person Zones -->
+        <div class="card">
+            <div class="card-title"><span class="icon">👥</span> People</div>
+            <div id="personZones" class="person-zones"></div>
+        </div>
+
+        <!-- Summary -->
+        <div class="card">
+            <div class="card-title"><span class="icon">💰</span> Summary</div>
+            <div id="summary"></div>
+        </div>
+
+        <button class="reset-btn" onclick="resetAll()">🔄 Reset All Assignments</button>
+    </div>
+
+    <script>
+        // ==================== MOCK DATA ====================
+        // Simulating AI receipt scan results
+        const mockItems = [
+            { id: 1, name: 'Chicken Rice', price: 5.50 },
+            { id: 2, name: 'Laksa', price: 7.00 },
+            { id: 3, name: 'Nasi Lemak', price: 6.00 },
+            { id: 4, name: 'Kopi O', price: 1.80 },
+            { id: 5, name: 'Teh Tarik', price: 2.00 },
+            { id: 6, name: 'Milo Dinosaur', price: 3.50 },
+            { id: 7, name: 'Roti Prata', price: 4.00 },
+            { id: 8, name: 'Shared Platter', price: 18.00 },
+        ];
+
+        const mockPeople = ['Shawn', 'Alex', 'Wei Ming', 'Sarah'];
+
+        // ==================== STATE ====================
+        // assignments[personName] = [itemId, ...]
+        let assignments = {};
+        let currentMode = 'drag';
+        let selectedItemId = null; // for tap mode
+
+        // Initialize assignments
+        mockPeople.forEach(p => assignments[p] = []);
+
+        // ==================== DRAG & DROP (TOUCH + MOUSE) ====================
+        let dragState = null;
+        let cloneEl = null;
+
+        function startDrag(e, itemId) {
+            if (currentMode !== 'drag') return;
+
+            e.preventDefault();
+            const touch = e.touches ? e.touches[0] : e;
+            const target = e.currentTarget;
+
+            // Create floating clone
+            cloneEl = target.cloneNode(true);
+            cloneEl.classList.add('drag-clone');
+            cloneEl.style.width = target.offsetWidth + 'px';
+            document.body.appendChild(cloneEl);
+
+            const rect = target.getBoundingClientRect();
+            dragState = {
+                itemId,
+                offsetX: touch.clientX - rect.left,
+                offsetY: touch.clientY - rect.top,
+                sourceEl: target,
+            };
+
+            target.classList.add('dragging');
+            moveClone(touch.clientX, touch.clientY);
+
+            if (e.touches) {
+                document.addEventListener('touchmove', onDragMove, { passive: false });
+                document.addEventListener('touchend', onDragEnd);
+            } else {
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+            }
+        }
+
+        function moveClone(x, y) {
+            if (!cloneEl || !dragState) return;
+            cloneEl.style.left = (x - dragState.offsetX) + 'px';
+            cloneEl.style.top = (y - dragState.offsetY) + 'px';
+        }
+
+        function onDragMove(e) {
+            e.preventDefault();
+            const touch = e.touches ? e.touches[0] : e;
+            moveClone(touch.clientX, touch.clientY);
+
+            // Highlight drop zones
+            document.querySelectorAll('.person-zone, .items-pool').forEach(zone => {
+                const rect = zone.getBoundingClientRect();
+                const isOver = touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                               touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+                zone.classList.toggle('drag-over', isOver);
+            });
+        }
+
+        function onDragEnd(e) {
+            const touch = e.changedTouches ? e.changedTouches[0] : e;
+
+            // Find which zone we dropped on
+            let dropped = false;
+            document.querySelectorAll('.person-zone').forEach(zone => {
+                const rect = zone.getBoundingClientRect();
+                const isOver = touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                               touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+                if (isOver && dragState) {
+                    const person = zone.dataset.person;
+                    assignItem(person, dragState.itemId);
+                    dropped = true;
+                }
+            });
+
+            // Check if dropped back on pool (unassign from source)
+            if (!dropped) {
+                const pool = document.getElementById('itemsPool');
+                const rect = pool.getBoundingClientRect();
+                const isOver = touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                               touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+                // If dropped on pool, do nothing (item stays where it was)
+            }
+
+            // Clean up
+            if (dragState?.sourceEl) dragState.sourceEl.classList.remove('dragging');
+            if (cloneEl) cloneEl.remove();
+            cloneEl = null;
+            dragState = null;
+
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            document.removeEventListener('touchmove', onDragMove);
+            document.removeEventListener('touchend', onDragEnd);
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+
+            render();
+        }
+
+        // ==================== TAP MODE ====================
+        function handleItemTap(itemId) {
+            if (currentMode !== 'tap') return;
+
+            if (selectedItemId === itemId) {
+                selectedItemId = null; // deselect
+            } else {
+                selectedItemId = itemId;
+            }
+            render();
+        }
+
+        function handlePersonTap(person) {
+            if (currentMode !== 'tap' || selectedItemId === null) return;
+
+            assignItem(person, selectedItemId);
+            selectedItemId = null;
+            render();
+        }
+
+        // ==================== ASSIGNMENT LOGIC ====================
+        function assignItem(person, itemId) {
+            if (!assignments[person].includes(itemId)) {
+                assignments[person].push(itemId);
+            }
+        }
+
+        function unassignItem(person, itemId) {
+            assignments[person] = assignments[person].filter(id => id !== itemId);
+            render();
+        }
+
+        function assignAllEvenly() {
+            const unassigned = getUnassignedItems();
+            unassigned.forEach(item => {
+                mockPeople.forEach(p => {
+                    if (!assignments[p].includes(item.id)) {
+                        assignments[p].push(item.id);
+                    }
+                });
+            });
+            render();
+        }
+
+        function resetAll() {
+            mockPeople.forEach(p => assignments[p] = []);
+            selectedItemId = null;
+            render();
+        }
+
+        function getUnassignedItems() {
+            const assignedIds = new Set();
+            Object.values(assignments).forEach(ids => ids.forEach(id => assignedIds.add(id)));
+            return mockItems.filter(item => !assignedIds.has(item.id));
+        }
+
+        function getItemShareCount(itemId) {
+            let count = 0;
+            Object.values(assignments).forEach(ids => {
+                if (ids.includes(itemId)) count++;
+            });
+            return count;
+        }
+
+        function getPersonTotal(person) {
+            let total = 0;
+            assignments[person].forEach(itemId => {
+                const item = mockItems.find(i => i.id === itemId);
+                if (item) {
+                    const shareCount = getItemShareCount(itemId);
+                    total += item.price / shareCount;
+                }
+            });
+            return total;
+        }
+
+        // ==================== MODE ====================
+        function setMode(mode) {
+            currentMode = mode;
+            selectedItemId = null;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.mode-btn[onclick="setMode('${mode}')"]`).classList.add('active');
+            document.getElementById('tapInstruction').style.display = mode === 'tap' ? 'block' : 'none';
+            render();
+        }
+
+        // ==================== RENDER ====================
+        function render() {
+            renderPool();
+            renderPersonZones();
+            renderSummary();
+        }
+
+        function renderPool() {
+            const pool = document.getElementById('itemsPool');
+            const unassigned = getUnassignedItems();
+
+            // Also show items that ARE assigned but can still be shared
+            // Actually, show ALL items in the pool — ones already assigned show a badge
+            const html = mockItems.map(item => {
+                const shareCount = getItemShareCount(item.id);
+                const isUnassigned = shareCount === 0;
+                const isSelected = selectedItemId === item.id;
+
+                return `
+                    <div class="item-chip ${isSelected ? 'drag-over' : ''}"
+                         style="${!isUnassigned ? 'opacity: 0.5;' : ''} ${isSelected ? 'outline: 2px solid #667eea; background: #eef0ff;' : ''}"
+                         onmousedown="startDrag(event, ${item.id})"
+                         ontouchstart="startDrag(event, ${item.id})"
+                         onclick="handleItemTap(${item.id})">
+                        <span class="item-name">${item.name}</span>
+                        <span class="item-price">$${item.price.toFixed(2)}</span>
+                        ${shareCount > 0 ? `<span class="shared-badge">${shareCount}</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            pool.innerHTML = html;
+
+            const allAssigned = getUnassignedItems().length === 0;
+            pool.classList.toggle('empty-hint', allAssigned && mockItems.length > 0);
+        }
+
+        function renderPersonZones() {
+            const container = document.getElementById('personZones');
+            const isSelected = selectedItemId !== null;
+
+            container.innerHTML = mockPeople.map(person => {
+                const personItems = assignments[person].map(itemId => mockItems.find(i => i.id === itemId)).filter(Boolean);
+                const total = getPersonTotal(person);
+
+                return `
+                    <div class="person-zone ${isSelected && currentMode === 'tap' ? 'drag-over' : ''}"
+                         data-person="${person}"
+                         onclick="handlePersonTap('${person}')">
+                        <div class="person-header">
+                            <span class="person-name">${person}</span>
+                            <span class="person-total">S$ ${total.toFixed(2)}</span>
+                        </div>
+                        <div class="person-items">
+                            ${personItems.map(item => {
+                                const shareCount = getItemShareCount(item.id);
+                                return `
+                                    <div class="item-chip"
+                                         onmousedown="startDrag(event, ${item.id})"
+                                         ontouchstart="startDrag(event, ${item.id})">
+                                        <span class="item-name">${item.name}</span>
+                                        <span class="item-price">$${(item.price / shareCount).toFixed(2)}</span>
+                                        ${shareCount > 1 ? `<span class="shared-badge">÷${shareCount}</span>` : ''}
+                                        <button class="remove-btn" onclick="event.stopPropagation(); unassignItem('${person}', ${item.id})">×</button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSummary() {
+            const container = document.getElementById('summary');
+            const unassigned = getUnassignedItems();
+            const unassignedTotal = unassigned.reduce((sum, item) => sum + item.price, 0);
+            let grandTotal = 0;
+
+            let html = mockPeople.map(person => {
+                const total = getPersonTotal(person);
+                grandTotal += total;
+                return `
+                    <div class="summary-row">
+                        <span>${person}</span>
+                        <span>S$ ${total.toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            if (unassigned.length > 0) {
+                html += `
+                    <div class="summary-row">
+                        <span class="unassigned">⚠️ Unassigned (${unassigned.length} items)</span>
+                        <span class="unassigned">S$ ${unassignedTotal.toFixed(2)}</span>
+                    </div>
+                `;
+            }
+
+            const billTotal = mockItems.reduce((sum, item) => sum + item.price, 0);
+            html += `
+                <div class="summary-row total">
+                    <span>Total</span>
+                    <span>S$ ${billTotal.toFixed(2)}</span>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // ==================== INIT ====================
+        render();
+    </script>
+</body>
+</html>
