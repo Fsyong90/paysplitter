@@ -1784,6 +1784,34 @@
 
         .alloc-person-zones { display: flex; flex-direction: column; gap: 10px; }
 
+        /* Sticky selected item banner for tap mode */
+        .alloc-tap-floating {
+            display: none; position: sticky; top: 0; z-index: 100;
+            background: linear-gradient(135deg, #7B2D8E, #E91E8C);
+            color: white; padding: 10px 16px; border-radius: 10px;
+            text-align: center; font-size: 14px; font-weight: 600;
+            box-shadow: 0 4px 15px rgba(123,45,142,0.3);
+            margin-bottom: 8px; animation: allocPulse 1.5s ease-in-out infinite;
+        }
+        .alloc-tap-floating.visible { display: block; }
+        @keyframes allocPulse {
+            0%, 100% { box-shadow: 0 4px 15px rgba(123,45,142,0.3); }
+            50% { box-shadow: 0 4px 20px rgba(123,45,142,0.5); }
+        }
+
+        /* Auto-scroll edge indicators */
+        .alloc-scroll-indicator {
+            position: fixed; left: 0; right: 0; height: 40px; z-index: 9998;
+            pointer-events: none; opacity: 0; transition: opacity 0.2s;
+        }
+        .alloc-scroll-indicator.top {
+            top: 0; background: linear-gradient(to bottom, rgba(123,45,142,0.15), transparent);
+        }
+        .alloc-scroll-indicator.bottom {
+            bottom: 0; background: linear-gradient(to top, rgba(123,45,142,0.15), transparent);
+        }
+        .alloc-scroll-indicator.active { opacity: 1; }
+
         .alloc-person-zone {
             border: 2px solid #e8e8e8; border-radius: 14px; padding: 12px;
             transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
@@ -1845,6 +1873,8 @@
     </style>
 </head>
 <body>
+<div id="allocScrollTop" class="alloc-scroll-indicator top"></div>
+<div id="allocScrollBottom" class="alloc-scroll-indicator bottom"></div>
     <!-- Sync Indicator Toast -->
     <div class="sync-toast" id="syncToast">
         <div class="sync-spinner" id="syncSpinner"></div>
@@ -2016,6 +2046,7 @@
                 <button class="alloc-split-all-btn" onclick="splitAllEqually()">⚡ Split all items evenly</button>
             </div>
             <div style="margin-top: 16px;">
+                <div id="allocTapFloating" class="alloc-tap-floating"></div>
                 <div style="font-size: 13px; font-weight: 600; color: #888; margin-bottom: 8px;">👥 People</div>
                 <div id="allocPersonZones" class="alloc-person-zones"></div>
             </div>
@@ -3149,6 +3180,7 @@
         let allocSelectedItemId = null;
         let allocDragState = null;
         let allocCloneEl = null;
+        let allocAutoScrollInterval = null;
 
         function setAllocationMode(mode) {
             allocMode = mode;
@@ -3156,6 +3188,7 @@
             document.getElementById('allocDragBtn').classList.toggle('active', mode === 'drag');
             document.getElementById('allocTapBtn').classList.toggle('active', mode === 'tap');
             document.getElementById('allocTapInstruction').style.display = mode === 'tap' ? 'block' : 'none';
+            allocUpdateTapFloating();
             renderAllocation();
         }
 
@@ -3242,12 +3275,52 @@
             const touch = e.touches ? e.touches[0] : e;
             allocMoveClone(touch.clientX, touch.clientY);
 
+            // Auto-scroll when dragging near viewport edges
+            allocAutoScroll(touch.clientY);
+
             document.querySelectorAll('.alloc-person-zone, .alloc-items-pool').forEach(zone => {
                 const rect = zone.getBoundingClientRect();
                 const isOver = touch.clientX >= rect.left && touch.clientX <= rect.right &&
                                touch.clientY >= rect.top && touch.clientY <= rect.bottom;
                 zone.classList.toggle('drag-over', isOver);
             });
+        }
+
+        function allocAutoScroll(clientY) {
+            const edgeSize = 60; // px from edge to trigger scroll
+            const maxSpeed = 12; // max px per frame
+            const vh = window.innerHeight;
+            const topInd = document.getElementById('allocScrollTop');
+            const botInd = document.getElementById('allocScrollBottom');
+
+            clearInterval(allocAutoScrollInterval);
+            allocAutoScrollInterval = null;
+            if (topInd) topInd.classList.remove('active');
+            if (botInd) botInd.classList.remove('active');
+
+            if (clientY < edgeSize) {
+                // Near top edge — scroll up
+                const intensity = 1 - (clientY / edgeSize);
+                const speed = Math.max(2, Math.round(maxSpeed * intensity));
+                if (topInd) topInd.classList.add('active');
+                allocAutoScrollInterval = setInterval(() => {
+                    window.scrollBy(0, -speed);
+                    if (allocCloneEl && allocDragState) {
+                        allocCloneEl.style.top = (parseFloat(allocCloneEl.style.top) - speed) + 'px';
+                    }
+                }, 16);
+            } else if (clientY > vh - edgeSize) {
+                // Near bottom edge — scroll down
+                const intensity = 1 - ((vh - clientY) / edgeSize);
+                const speed = Math.max(2, Math.round(maxSpeed * intensity));
+                if (botInd) botInd.classList.add('active');
+                allocAutoScrollInterval = setInterval(() => {
+                    window.scrollBy(0, speed);
+                    if (allocCloneEl && allocDragState) {
+                        allocCloneEl.style.top = (parseFloat(allocCloneEl.style.top) + speed) + 'px';
+                    }
+                }, 16);
+            }
         }
 
         function allocOnDragEnd(e) {
@@ -3279,6 +3352,9 @@
             }
 
             // Clean up
+            clearInterval(allocAutoScrollInterval);
+            allocAutoScrollInterval = null;
+            document.querySelectorAll('.alloc-scroll-indicator').forEach(el => el.classList.remove('active'));
             if (allocDragState?.sourceEl) allocDragState.sourceEl.classList.remove('dragging');
             if (allocCloneEl) allocCloneEl.remove();
             allocCloneEl = null;
@@ -3294,6 +3370,7 @@
         function allocHandleItemTap(itemId) {
             if (allocMode !== 'tap') return;
             allocSelectedItemId = (allocSelectedItemId === itemId) ? null : itemId;
+            allocUpdateTapFloating();
             renderAllocation();
         }
 
@@ -3301,6 +3378,22 @@
             if (allocMode !== 'tap' || allocSelectedItemId === null) return;
             allocAssignItem(person, allocSelectedItemId);
             allocSelectedItemId = null;
+            allocUpdateTapFloating();
+        }
+
+        function allocUpdateTapFloating() {
+            const banner = document.getElementById('allocTapFloating');
+            if (!banner) return;
+            if (allocSelectedItemId !== null && allocMode === 'tap') {
+                const item = items.find(i => i.id === allocSelectedItemId);
+                if (item) {
+                    banner.textContent = '👆 Tap a person to assign: ' + (item.name || 'Item') + ' ($' + (item.price || 0).toFixed(2) + ')';
+                    banner.classList.add('visible');
+                    return;
+                }
+            }
+            banner.classList.remove('visible');
+            banner.textContent = '';
         }
 
         // --- Main Render ---
