@@ -2019,9 +2019,9 @@
                 <label class="ocr-upload" id="ocrUpload">
                     <input type="file" accept="image/*" onchange="handleReceiptUpload(event)">
                     <span class="upload-icon">📸</span>
-                    <span class="upload-title">Scan Receipt with AI</span>
-                    <span class="upload-subtitle">Take a photo or upload an image</span>
-                    <span class="ai-badge">✨ Powered by AI</span>
+                    <span class="upload-title">Upload Receipt</span>
+                    <span class="upload-subtitle">Share an image with your team; enter items manually</span>
+                    <span class="ai-badge">AI scanning unavailable</span>
                 </label>
                 <div class="ocr-status" id="ocrStatus"></div>
             </div>
@@ -4435,15 +4435,16 @@
             document.getElementById('receiptModal').classList.remove('show');
         }
 
-        // ==================== Receipt Scanning (ai.insea.io API) ====================
+        // ==================== Receipt Upload ====================
+        // AI scanning is disabled until a server-side integration can keep credentials private.
 
-        const INSEA_API_KEY = 'yz1PZMqqNAQRVXeOmie0gkaDft9I2l0R';
-        const INSEA_API_URL = 'https://ai.insea.io/api/workflows/10902/run';
-
-        // Handle receipt upload
+        // Handle receipt upload while preserving team receipt sharing.
         async function handleReceiptUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            const status = document.getElementById('ocrStatus');
+            event.target.value = '';
 
             // Check file size (max 2MB for protection)
             if (file.size > 2 * 1024 * 1024) {
@@ -4451,78 +4452,23 @@
                 return;
             }
 
-            const status = document.getElementById('ocrStatus');
             status.className = 'ocr-status show';
-            status.textContent = 'Uploading receipt...';
+            status.textContent = 'AI receipt scanning is unavailable. Please enter items manually.';
 
-            try {
-                // Upload image to Firebase Storage if connected to team
-                if (currentTeamCode) {
-                    await uploadReceiptToFirebase(file);
-                }
-
-                // Create FormData and send to ai.insea.io
-                const formData = new FormData();
-                formData.append('receipt_image', file);
-
-                status.textContent = 'Analyzing receipt with AI...';
-
-                const response = await fetch(INSEA_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${INSEA_API_KEY}`
-                    },
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
-
-                const result = await response.json();
-                console.log('API Response:', result);
-
-                // Parse the response from the API
-                const outputs = result.data?.outputs || {};
-                const splitResult = outputs.split_result || '';
-                const extracted = parseInseaResult(splitResult);
-
-                // Auto-fill bill options if provided
-                if (outputs.service_charge && outputs.service_charge > 0) {
-                    document.getElementById('hasService').checked = true;
-                    // Calculate service charge percentage from subtotal after discount
-                    const subtotalAfterDiscount = (outputs.subtotal || 0) - (outputs.discount || 0);
-                    if (subtotalAfterDiscount > 0) {
-                        const svcPct = (outputs.service_charge / subtotalAfterDiscount * 100).toFixed(1);
-                        document.getElementById('serviceRate').value = svcPct;
-                    }
-                }
-                if (outputs.discount && outputs.discount > 0) {
-                    document.getElementById('discountValue').value = outputs.discount.toFixed(2);
-                    document.getElementById('discountType').value = 'amount';
-                }
-                // Auto-fill expected total (grand_total from receipt)
-                if (outputs.grand_total && outputs.grand_total > 0) {
-                    document.getElementById('expectedTotal').value = outputs.grand_total.toFixed(2);
-                }
-
-                if (extracted.length > 0) {
-                    // Show preview instead of adding directly
-                    showOcrPreview(extracted);
-                    status.textContent = `Found ${extracted.length} items - review below`;
-                    setTimeout(() => { status.className = 'ocr-status'; }, 3000);
-                } else {
+            if (currentTeamCode) {
+                status.textContent = 'Uploading receipt for your team...';
+                try {
+                    const receiptUrl = await uploadReceiptToFirebase(file);
+                    status.className = receiptUrl ? 'ocr-status show' : 'ocr-status show error';
+                    status.textContent = receiptUrl
+                        ? 'Receipt shared with your team. AI scanning is unavailable; please enter items manually.'
+                        : 'Receipt upload failed. AI scanning is unavailable; please enter items manually.';
+                } catch (e) {
+                    console.error('Receipt upload error:', e);
                     status.className = 'ocr-status show error';
-                    const rawText = typeof splitResult === 'string' ? splitResult : JSON.stringify(splitResult);
-                    status.innerHTML = `No items found. <button onclick="showRawOcrText(\`${rawText.replace(/`/g, "'").replace(/\\/g, "\\\\").replace(/\n/g, "\\n")}\`)" style="margin-left:8px;padding:4px 8px;border:1px solid #c62828;background:white;border-radius:4px;cursor:pointer;">View Raw Text</button>`;
+                    status.textContent = 'Receipt upload failed. AI scanning is unavailable; please enter items manually.';
                 }
-            } catch (e) {
-                console.error('API error:', e);
-                status.className = 'ocr-status show error';
-                status.textContent = 'Error analyzing receipt. Please try again.';
             }
-
-            event.target.value = '';
         }
 
         // Parse the ai.insea.io result format

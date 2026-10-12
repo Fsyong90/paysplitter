@@ -60,7 +60,7 @@ Uses EMVCo QR specification:
 | Function | Purpose |
 |----------|---------|
 | `connectToTeam(code)` | Subscribes to Firebase real-time updates |
-| `handleReceiptUpload()` | Uploads to Storage + sends to AI API |
+| `handleReceiptUpload()` | Shares receipts through Storage; AI scanning is disabled |
 | `uploadReceiptToFirebase()` | Stores image, updates Firestore with URL |
 | `calculate()` | Main calculation, updates all displays |
 | `splitAllEqually()` | Assigns all items to all people |
@@ -68,7 +68,7 @@ Uses EMVCo QR specification:
 
 ## API Keys (in code)
 
-- **ai.insea.io**: `yz1PZMqqNAQRVXeOmie0gkaDft9I2l0R`
+- **ai.insea.io**: No client-side credential. AI scanning is disabled until a secure server-side integration is configured.
 - **Firebase**: Config object with project `paysplitter-16bd6`
 
 ## Development
